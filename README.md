@@ -37,6 +37,17 @@ Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is 
 
 ---
 
+## Getting Started
+
+To install the required dependencies, run:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
 ## Author
 
 **Madison Webb**
+
