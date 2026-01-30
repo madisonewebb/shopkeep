@@ -1,0 +1,81 @@
+version: '3'
+
+tasks:
+  install:
+    desc: Install production dependencies
+    cmds:
+      - pip install -r requirements.txt
+
+  install-dev:
+    desc: Install development dependencies
+    cmds:
+      - pip install -r requirements.txt
+      - pip install -r requirements-dev.txt
+
+  setup-hooks:
+    desc: Install pre-commit hooks
+    cmds:
+      - pre-commit install
+    deps:
+      - install-dev
+
+  lint:
+    desc: Run all linters
+    cmds:
+      - task: ruff-check
+      - task: black-check
+      - task: mypy
+
+  format:
+    desc: Auto-format code with ruff and black
+    cmds:
+      - ruff check --fix .
+      - black .
+
+  black-check:
+    desc: Check code formatting with black
+    cmds:
+      - black --check .
+
+  ruff-check:
+    desc: Run ruff linter
+    cmds:
+      - ruff check .
+
+  ruff-fix:
+    desc: Run ruff with auto-fix
+    cmds:
+      - ruff check --fix .
+
+  mypy:
+    desc: Run mypy type checker
+    cmds:
+      - mypy .
+
+  pre-commit:
+    desc: Run pre-commit on all files
+    cmds:
+      - pre-commit run --all-files
+
+  pre-commit-update:
+    desc: Update pre-commit hooks
+    cmds:
+      - pre-commit autoupdate
+
+  run:
+    desc: Run the Discord bot
+    cmds:
+      - python3 discord_bot.py
+
+  clean:
+    desc: Clean up Python cache files
+    cmds:
+      - find . -type d -name __pycache__ -exec rm -rf {} +
+      - find . -type f -name "*.pyc" -delete
+      - find . -type f -name "*.pyo" -delete
+      - find . -type d -name "*.egg-info" -exec rm -rf {} +
+
+  help:
+    desc: Show available tasks
+    cmds:
+      - task --list
