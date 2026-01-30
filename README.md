@@ -39,11 +39,84 @@ Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is 
 
 ## Getting Started
 
-To install the required dependencies, run:
+### Prerequisites
+
+- Python 3.10+
+- [Task](https://taskfile.dev/) - Task runner
+- Discord Bot Token ([Get one here](https://discord.com/developers/applications))
+- Git
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd shopkeep
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   task install-dev
+   ```
+
+3. **Set up environment variables:**
+   Create a `.env` file in the project root:
+   ```bash
+   DISCORD_BOT_TOKEN=your_discord_bot_token_here
+   ```
+
+4. **Install pre-commit hooks:**
+   ```bash
+   task setup-hooks
+   ```
+
+5. **Enable Discord Bot Intents:**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications/)
+   - Select your application → Bot section
+   - Enable **MESSAGE CONTENT INTENT** under Privileged Gateway Intents
+
+### Running the Bot
 
 ```bash
-pip install -r requirements.txt
+task run
 ```
+
+---
+
+## Development
+
+### Available Tasks
+
+View all available tasks:
+```bash
+task help
+```
+
+Common commands:
+- `task install-dev` - Install all dependencies
+- `task format` - Auto-format code (black + isort)
+- `task lint` - Run all linters
+- `task pre-commit` - Run pre-commit on all files
+- `task run` - Run the Discord bot
+- `task clean` - Clean Python cache files
+
+### Code Quality
+
+This project uses:
+- **black** - Code formatting
+- **isort** - Import sorting
+- **flake8** - Style linting
+- **mypy** - Type checking
+- **pre-commit** - Git hooks for automatic checks
+
+Pre-commit hooks run automatically on `git commit`. To run manually:
+```bash
+task lint
+```
+
+### CI/CD
+
+GitHub Actions automatically runs linting and tests on all PRs and pushes to `main`/`develop` branches.
 
 ---
 
