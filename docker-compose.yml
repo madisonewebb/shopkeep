@@ -1,0 +1,39 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopkeep-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+    volumes:
+      - ./src:/app/src:ro
+    networks:
+      - shopkeep-network
+
+  # PostgreSQL database (optional - uncomment when ready to use)
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: shopkeep-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: shopkeep
+  #     POSTGRES_USER: shopkeep
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - shopkeep-network
+
+networks:
+  shopkeep-network:
+    driver: bridge
+
+# Uncomment when using PostgreSQL
+# volumes:
+#   postgres_data:
