@@ -44,8 +44,46 @@ Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is 
 - Python 3.10+
 - [Task](https://taskfile.dev/) - Task runner
 - Discord Bot Token ([Get one here](https://discord.com/developers/applications))
+- **OR** Docker & [Tilt](https://tilt.dev/) (for containerized development)
 
 ### Installation
+
+#### Option 1: Tilt (Recommended)
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone <your-repo-url>
+   cd shopkeep
+   ```
+2. **Set up environment variables:**
+   Create a `.env` file in the project root:
+
+   ```bash
+   DISCORD_BOT_TOKEN=your_discord_bot_token_here
+   ```
+3. **Start Tilt:**
+
+   ```bash
+   tilt up
+   ```
+
+   This will:
+
+   - Build the Docker image
+   - Deploy the bot
+   - Watch for file changes and auto-reload
+   - Open the Tilt UI in your browser
+4. **View logs:**
+
+   - Use the Tilt UI (opens automatically)
+   - Or press `space` in the terminal to open the UI
+5. **Stop Tilt:**
+
+   - Press `Ctrl+C` in the terminal
+   - Or run: `tilt down`
+
+#### Option 2: Local Python Installation
 
 1. **Clone the repository:**
 
@@ -71,6 +109,12 @@ Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is 
    ```
 
 ### Running the Bot
+
+```bash
+python -m src.bot.discord_bot
+```
+
+Or use the task runner:
 
 ```bash
 task run
@@ -113,6 +157,8 @@ task lint
 ```
 
 ---
+
+
 
 ## Author
 
