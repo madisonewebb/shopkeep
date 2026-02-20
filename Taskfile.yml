@@ -67,6 +67,16 @@ tasks:
     cmds:
       - python3 discord_bot.py
 
+  mock-api:
+    desc: Run the mock Etsy API server
+    cmds:
+      - python3 mock_etsy_api.py
+
+  test-mock-api:
+    desc: Test the mock Etsy API with example client
+    cmds:
+      - python3 mock_etsy_client.py
+
   clean:
     desc: Clean up Python cache files
     cmds:
