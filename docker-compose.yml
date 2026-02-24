@@ -1,4 +1,23 @@
 services:
+  mock-etsy-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.etsy
+    container_name: shopkeep-mock-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./src/etsy:/app/src/etsy:ro
+    networks:
+      - shopkeep-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/v3/application/openapi-ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
   bot:
     build:
       context: .
@@ -9,10 +28,14 @@ services:
       - .env
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - ETSY_API_URL=http://mock-etsy-api:5000
     volumes:
       - ./src:/app/src:ro
     networks:
       - shopkeep-network
+    depends_on:
+      mock-etsy-api:
+        condition: service_healthy
 
   # PostgreSQL database (optional - uncomment when ready to use)
   # db:
