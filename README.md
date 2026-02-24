@@ -122,6 +122,34 @@ task run
 
 ---
 
+## Mock Etsy API
+
+While waiting for your Etsy API key activation, you can use the included **Mock Etsy API server** for development and testing.
+
+### Quick Start
+
+1. **Start the mock API server:**
+   ```bash
+   task mock-api
+   ```
+   Server runs on `http://localhost:5000`
+
+2. **Test the mock API:**
+   ```bash
+   task test-mock-api
+   ```
+
+### Features
+
+- ✅ OAuth2 authentication flow
+- ✅ Shop, receipt (order), and listing endpoints
+- ✅ Pre-populated sample data
+- ✅ API-compatible with real Etsy API v3
+
+See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for complete documentation.
+
+---
+
 ## Development
 
 ### Available Tasks
@@ -139,6 +167,8 @@ Common commands:
 - `task lint` - Run all linters
 - `task pre-commit` - Run pre-commit on all files
 - `task run` - Run the Discord bot
+- `task mock-api` - Run the mock Etsy API server
+- `task test-mock-api` - Test the mock Etsy API
 - `task clean` - Clean Python cache files
 
 ### Code Quality
