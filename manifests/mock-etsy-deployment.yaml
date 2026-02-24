@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-etsy-api
+  namespace: shopkeep
+  labels:
+    app: mock-etsy-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-etsy-api
+  template:
+    metadata:
+      labels:
+        app: mock-etsy-api
+    spec:
+      containers:
+      - name: mock-api
+        image: ghcr.io/madisonewebb/shopkeep-mock-etsy:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /v3/application/openapi-ping
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /v3/application/openapi-ping
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-etsy-api
+  namespace: shopkeep
+spec:
+  selector:
+    app: mock-etsy-api
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  type: ClusterIP

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shopkeep-bot
+  namespace: shopkeep
+  labels:
+    app: shopkeep-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopkeep-bot
+  template:
+    metadata:
+      labels:
+        app: shopkeep-bot
+    spec:
+      containers:
+      - name: bot
+        image: ghcr.io/madisonewebb/shopkeep:latest
+        imagePullPolicy: Always
+        env:
+        - name: DISCORD_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: DISCORD_BOT_TOKEN
+        - name: ETSY_API_URL
+          value: "http://mock-etsy-api:5000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+      restartPolicy: Always
