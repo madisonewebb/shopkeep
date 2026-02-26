@@ -4,7 +4,6 @@ kind: Kustomization
 namespace: shopkeep
 
 resources:
-  - namespace.yaml
   - secret.yaml
   - deployment.yaml
   - mock-etsy-deployment.yaml
