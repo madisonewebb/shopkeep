@@ -42,13 +42,14 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          kubectl config set-cluster in-cluster \
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+          KUBECONFIG=/tmp/kubeconfig kubectl config set-cluster in-cluster \
             --server=https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT} \
             --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          kubectl config set-credentials runner \
+          KUBECONFIG=/tmp/kubeconfig kubectl config set-credentials runner \
             --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-          kubectl config set-context in-cluster --cluster=in-cluster --user=runner
-          kubectl config use-context in-cluster
+          KUBECONFIG=/tmp/kubeconfig kubectl config set-context in-cluster --cluster=in-cluster --user=runner
+          KUBECONFIG=/tmp/kubeconfig kubectl config use-context in-cluster
 
       - name: Apply manifests
         run: kubectl apply -k manifests/
