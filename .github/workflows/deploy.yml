@@ -6,6 +6,7 @@ on:
 
 env:
   IMAGE: ghcr.io/madisonewebb/shopkeep
+  MOCK_IMAGE: ghcr.io/madisonewebb/shopkeep-mock-etsy
 
 jobs:
   build:
@@ -23,13 +24,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push bot
         uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.bot
           push: true
           tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Build and push mock-etsy
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.etsy
+          push: true
+          tags: ${{ env.MOCK_IMAGE }}:latest,${{ env.MOCK_IMAGE }}:${{ github.sha }}
 
   deploy:
     needs: build
