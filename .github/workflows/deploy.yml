@@ -37,19 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Configure kubectl
-        run: |
-          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
-          KUBECONFIG=/tmp/kubeconfig kubectl config set-cluster in-cluster \
-            --server=https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT} \
-            --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          KUBECONFIG=/tmp/kubeconfig kubectl config set-credentials runner \
-            --token=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-          KUBECONFIG=/tmp/kubeconfig kubectl config set-context in-cluster --cluster=in-cluster --user=runner
-          KUBECONFIG=/tmp/kubeconfig kubectl config use-context in-cluster
+      - uses: tale/kubectl-action@v1
+        with:
+          base64-kube-config: ${{ secrets.KUBECONFIG_DATA }}
 
       - name: Apply manifests
         run: kubectl apply -k manifests/
