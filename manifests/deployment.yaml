@@ -15,6 +15,8 @@ spec:
       labels:
         app: shopkeep-bot
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
       - name: bot
         image: ghcr.io/madisonewebb/shopkeep:latest
@@ -25,8 +27,22 @@ spec:
             secretKeyRef:
               name: shopkeep-secrets
               key: DISCORD_BOT_TOKEN
+        - name: ORDER_CHANNEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: ORDER_CHANNEL_ID
         - name: ETSY_API_URL
           value: "http://mock-etsy-api:5000"
+        - name: ETSY_SHOP_ID
+          value: "12345678"
+        - name: POLL_INTERVAL_SECS
+          value: "60"
+        - name: DB_PATH
+          value: "/app/data/shopkeep.db"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
         resources:
           requests:
             memory: "128Mi"
@@ -34,4 +50,8 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: shopkeep-data
       restartPolicy: Always
