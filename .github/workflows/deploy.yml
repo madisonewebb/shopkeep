@@ -54,6 +54,7 @@ jobs:
         run: |
           kubectl create secret generic shopkeep-secrets \
             --from-literal=DISCORD_BOT_TOKEN=${{ secrets.DISCORD_BOT_TOKEN }} \
+            --from-literal=ORDER_CHANNEL_ID=${{ secrets.ORDER_CHANNEL_ID }} \
             -n shopkeep \
             --dry-run=client -o yaml | kubectl apply -f -
 
