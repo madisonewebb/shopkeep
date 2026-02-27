@@ -1,15 +1,18 @@
-# Shopkeep 🛍️🤖
+# Shopkeep
 
-Shopkeep is a Discord bot that integrates with the Etsy API to deliver shop notifications and shop insights directly into a Discord server.
+[![Deploy](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml/badge.svg)](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml)
+
+Shopkeep is a Discord bot that integrates with the Etsy API to deliver real-time shop order notifications directly into a Discord server.
 
 ---
 
 ## Features
 
-- 📦 Real-time Etsy order notifications
-- 💬 Discord slash commands for shop info
-- 📊 Basic shop statistics and metrics
-- 🗄️ Optional data storage for orders and shop data
+- Real-time Etsy order notifications via Discord embeds
+- Order polling every 60 seconds (configurable)
+- SQLite persistence for orders, shops, and listings
+- Mock Etsy API for development without live credentials
+- Kubernetes deployment with k3s and Kustomize
 
 ---
 
@@ -18,22 +21,25 @@ Shopkeep is a Discord bot that integrates with the Etsy API to deliver shop noti
 - **Python** — backend and bot logic
 - **discord.py** — Discord API integration
 - **Etsy API** — shop, order, and listing data
-- **Docker** — containerized development
+- **SQLite** — async data persistence via aiosqlite
+- **Docker** — containerized development and deployment
 - **Tilt** — local container orchestration
-- **PostgreSQL** — data persistence
+- **Kubernetes / k3s** — production deployment
+- **Kustomize** — Kubernetes manifest management
+- **GitHub Actions** — CI/CD
 
 ---
 
-## Project Status
+## Environment Variables
 
-🚧 Early development
-Initial work is focused on Etsy API integration and Discord notifications for the MVP.
-
----
-
-## Disclaimer
-
-Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is for educational use.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DISCORD_BOT_TOKEN` | Yes | — | Discord bot token |
+| `ORDER_CHANNEL_ID` | Yes | `0` | Discord channel ID for order notifications |
+| `ETSY_API_URL` | No | `http://localhost:5000` | Etsy API base URL |
+| `ETSY_SHOP_ID` | No | `12345678` | Shop ID to monitor |
+| `POLL_INTERVAL_SECS` | No | `60` | Order polling frequency in seconds |
+| `DB_PATH` | No | `./shopkeep.db` | SQLite database path |
 
 ---
 
@@ -42,111 +48,103 @@ Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is 
 ### Prerequisites
 
 - Python 3.10+
-- [Task](https://taskfile.dev/) - Task runner
-- Discord Bot Token ([Get one here](https://discord.com/developers/applications))
-- **OR** Docker & [Tilt](https://tilt.dev/) (for containerized development)
+- [Task](https://taskfile.dev/) — task runner
+- Discord bot token ([get one here](https://discord.com/developers/applications))
+- **OR** Docker & [Tilt](https://tilt.dev/) for containerized development
 
-### Installation
-
-#### Option 1: Tilt (Recommended)
+### Option 1: Tilt (Recommended)
 
 1. **Clone the repository:**
 
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/madisonewebb/shopkeep.git
    cd shopkeep
    ```
+
 2. **Set up environment variables:**
-   Create a `.env` file in the project root:
 
    ```bash
-   DISCORD_BOT_TOKEN=your_discord_bot_token_here
+   cp .env.example .env
+   # Fill in DISCORD_BOT_TOKEN and ORDER_CHANNEL_ID
    ```
+
 3. **Start Tilt:**
 
    ```bash
    tilt up
    ```
 
-   This will:
+   This will build the Docker images, start the mock Etsy API and bot, and watch for file changes with auto-reload.
 
-   - Build the Docker image
-   - Deploy the bot
-   - Watch for file changes and auto-reload
-   - Open the Tilt UI in your browser
-4. **View logs:**
-
-   - Use the Tilt UI (opens automatically)
-   - Or press `space` in the terminal to open the UI
-5. **Stop Tilt:**
-
-   - Press `Ctrl+C` in the terminal
-   - Or run: `tilt down`
-
-#### Option 2: Local Python Installation
-
-1. **Clone the repository:**
+4. **Stop Tilt:**
 
    ```bash
-   git clone <your-repo-url>
-   cd shopkeep
+   tilt down
    ```
-2. **Install dependencies:**
+
+### Option 2: Docker Compose
+
+1. **Clone and configure:**
+
+   ```bash
+   git clone https://github.com/madisonewebb/shopkeep.git
+   cd shopkeep
+   cp .env.example .env
+   ```
+
+2. **Start services:**
+
+   ```bash
+   docker compose up
+   ```
+
+### Option 3: Local Python
+
+1. **Install dependencies:**
 
    ```bash
    task install-dev
    ```
-3. **Set up environment variables:**
-   Create a `.env` file in the project root:
+
+2. **Set up environment variables:**
 
    ```bash
-   DISCORD_BOT_TOKEN=your_discord_bot_token_here
+   cp .env.example .env
    ```
-4. **Install pre-commit hooks:**
+
+3. **Install pre-commit hooks:**
 
    ```bash
    task setup-hooks
    ```
 
-### Running the Bot
+4. **Run the bot:**
 
-```bash
-python -m src.bot.discord_bot
-```
-
-Or use the task runner:
-
-```bash
-task run
-```
+   ```bash
+   task run
+   ```
 
 ---
 
 ## Mock Etsy API
 
-While waiting for your Etsy API key activation, you can use the included **Mock Etsy API server** for development and testing.
-
-### Quick Start
+While waiting for your Etsy API key activation, use the included mock Etsy API server for development and testing.
 
 1. **Start the mock API server:**
+
    ```bash
    task mock-api
    ```
+
    Server runs on `http://localhost:5000`
 
 2. **Test the mock API:**
+
    ```bash
    task test-mock-api
    ```
 
-### Features
-
-- ✅ OAuth2 authentication flow
-- ✅ Shop, receipt (order), and listing endpoints
-- ✅ Pre-populated sample data
-- ✅ API-compatible with real Etsy API v3
-
-See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for complete documentation.
+See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for full documentation.
 
 ---
 
@@ -154,41 +152,53 @@ See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for complete documentation.
 
 ### Available Tasks
 
-View all available tasks:
-
 ```bash
 task help
 ```
 
-Common commands:
-
-- `task install-dev` - Install all dependencies
-- `task format` - Auto-format code (ruff + black)
-- `task lint` - Run all linters
-- `task pre-commit` - Run pre-commit on all files
-- `task run` - Run the Discord bot
-- `task mock-api` - Run the mock Etsy API server
-- `task test-mock-api` - Test the mock Etsy API
-- `task clean` - Clean Python cache files
+| Command | Description |
+|---|---|
+| `task install` | Install production dependencies |
+| `task install-dev` | Install all dependencies |
+| `task setup-hooks` | Install pre-commit git hooks |
+| `task run` | Run the Discord bot |
+| `task mock-api` | Run the mock Etsy API server |
+| `task test-mock-api` | Test the mock Etsy API |
+| `task format` | Auto-format code (ruff + black) |
+| `task lint` | Run all linters |
+| `task pre-commit` | Run pre-commit on all files |
+| `task clean` | Clean Python cache files |
 
 ### Code Quality
 
-This project uses:
-
-- **ruff** - Fast Python linter (replaces flake8, isort, and more)
-- **black** - Code formatting
-- **mypy** - Type checking
-- **pre-commit** - Git hooks for automatic checks
-
-Pre-commit hooks run automatically on `git commit`. To run manually:
-
-```bash
-task lint
-```
+- **ruff** — fast Python linter
+- **black** — code formatting
+- **mypy** — type checking
+- **pre-commit** — git hooks for automatic checks
 
 ---
 
+## Deployment
 
+The production deployment targets a k3s cluster via GitHub Actions on push to `main`.
+
+- Docker images are published to GHCR: `ghcr.io/madisonewebb/shopkeep`
+- Kubernetes manifests are applied via Kustomize from `manifests/`
+- The SQLite PVC (`manifests/pvc.yaml`) must be applied manually before first deploy:
+
+  ```bash
+  kubectl apply -f manifests/pvc.yaml
+  ```
+
+See [`docker/README.md`](docker/README.md) for container-specific documentation.
+
+---
+
+## Disclaimer
+
+Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is for educational use.
+
+---
 
 ## Author
 
