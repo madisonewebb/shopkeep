@@ -4,5 +4,6 @@ kind: Kustomization
 namespace: shopkeep
 
 resources:
+  - pvc.yaml
   - deployment.yaml
   - mock-etsy-deployment.yaml
