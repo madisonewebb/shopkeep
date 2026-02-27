@@ -1,3 +1,7 @@
+# One-time setup — apply manually with cluster-admin credentials:
+#   kubectl apply -f manifests/pvc.yaml
+# Excluded from kustomization intentionally: CI does not have PVC permissions
+# and recreating this would destroy the SQLite database.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
