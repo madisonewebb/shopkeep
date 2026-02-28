@@ -197,16 +197,20 @@ async def upsert_listings(db: aiosqlite.Connection, listings: list) -> None:
         await upsert_listing(db, listing)
 
 
-async def upsert_receipt(db: aiosqlite.Connection, receipt: dict) -> bool:
+async def upsert_receipt(db: aiosqlite.Connection, receipt: dict, already_seen: bool = False) -> bool:
     """
     Insert a new receipt row, ignoring conflicts to preserve notified_at on existing rows.
     Returns True if a new row was inserted.
+
+    Pass already_seen=True during bootstrap to stamp notified_at immediately so the
+    poll loop never treats pre-existing orders as new.
     """
     grandtotal = receipt.get("grandtotal", {})
     subtotal = receipt.get("subtotal", {})
     shipping = receipt.get("totalShippingCost", {})
     tax = receipt.get("totalTaxCost", {})
     discount = receipt.get("discountAmt", {})
+    notified_at = int(time.time()) if already_seen else None
 
     cursor = await db.execute(
         """
@@ -216,8 +220,9 @@ async def upsert_receipt(db: aiosqlite.Connection, receipt: dict) -> bool:
             payment_method, is_paid, is_shipped, is_gift, gift_message,
             grandtotal_amount, grandtotal_divisor, grandtotal_currency,
             subtotal_amount, total_shipping_amount, total_tax_amount,
-            discount_amount, create_timestamp, update_timestamp, fetched_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            discount_amount, create_timestamp, update_timestamp, fetched_at,
+            notified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             receipt["receiptId"],
@@ -247,6 +252,7 @@ async def upsert_receipt(db: aiosqlite.Connection, receipt: dict) -> bool:
             receipt.get("createTimestamp", int(time.time())),
             receipt.get("updateTimestamp"),
             int(time.time()),
+            notified_at,
         ),
     )
     return cursor.rowcount == 1
