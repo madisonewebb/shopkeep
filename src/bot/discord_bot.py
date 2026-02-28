@@ -25,6 +25,7 @@ class ShopkeepBot(discord.Client):
         super().__init__(intents=intents)
         self.etsy = MockEtsyClient(base_url=ETSY_API_URL)
         self._etsy_authed = False
+        self._bootstrapped = False
 
     async def setup_hook(self):
         """Called by discord.py before login; event loop is already running."""
@@ -34,12 +35,54 @@ class ShopkeepBot(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user} | Polling shop {ETSY_SHOP_ID} every {POLL_INTERVAL_SECS}s")
+        if not self._bootstrapped:
+            self._bootstrapped = True
+            try:
+                await self._bootstrap()
+            except Exception as exc:
+                print(f"[bootstrap] {exc}")
 
     async def _ensure_etsy_auth(self):
         if not self._etsy_authed:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self.etsy.get_access_token)
             self._etsy_authed = True
+
+    async def _bootstrap(self):
+        """Seed the DB with current shop state on first connect.
+
+        Upserts the shop, all active listings, and all existing receipts.
+        Receipts are marked already_seen=True so the poll loop only notifies
+        for orders that arrive after the bot starts.
+        """
+        print(f"[bootstrap] Seeding shop {ETSY_SHOP_ID}…")
+        loop = asyncio.get_running_loop()
+
+        await self._ensure_etsy_auth()
+
+        shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
+        listings_resp = await loop.run_in_executor(
+            None, lambda: self.etsy.get_shop_listings(ETSY_SHOP_ID, limit=100)
+        )
+        receipts_resp = await loop.run_in_executor(
+            None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=100)
+        )
+
+        listings = listings_resp.get("results", [])
+        receipts = receipts_resp.get("results", [])
+
+        async with await db.get_db() as conn:
+            await db.upsert_shop(conn, shop_data)
+            await db.upsert_listings(conn, listings)
+            for receipt in receipts:
+                receipt.setdefault("shopId", ETSY_SHOP_ID)
+                await db.upsert_receipt(conn, receipt, already_seen=True)
+            await conn.commit()
+
+        print(
+            f"[bootstrap] Done — shop '{shop_data.get('shopName')}', "
+            f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
+        )
 
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
