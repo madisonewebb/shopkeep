@@ -6,7 +6,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_order_embed
+from src.bot.notifier import build_order_embed, build_shop_embed
 from src.etsy.client import MockEtsyClient
 
 load_dotenv()
@@ -99,7 +99,18 @@ class ShopkeepBot(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
-        if message.content.strip().lower() != "!orders":
+
+        cmd = message.content.strip().lower()
+
+        if cmd == "!shop":
+            await self._ensure_etsy_auth()
+            loop = asyncio.get_running_loop()
+            shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
+            embed = build_shop_embed(shop_data)
+            await message.channel.send(embed=embed)
+            return
+
+        if cmd != "!orders":
             return
 
         await self._ensure_etsy_auth()
