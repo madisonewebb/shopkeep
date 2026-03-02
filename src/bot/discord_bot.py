@@ -31,7 +31,6 @@ class ShopkeepBot(discord.Client):
         """Called by discord.py before login; event loop is already running."""
         db.DB_PATH = DB_PATH_ENV
         await db.init_db()
-        self.poll_orders.start()
 
     async def on_ready(self):
         print(f"Logged in as {self.user} | Polling shop {ETSY_SHOP_ID} every {POLL_INTERVAL_SECS}s")
@@ -83,6 +82,7 @@ class ShopkeepBot(discord.Client):
             f"[bootstrap] Done — shop '{shop_data.get('shop_name')}', "
             f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
         )
+        self.poll_orders.start()
 
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
