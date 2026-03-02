@@ -2,6 +2,7 @@
 Mock Etsy API v3 Server
 Mimics the real Etsy API v3 for development and testing purposes.
 Based on: https://developer.etsy.com/documentation/
+All response fields use snake_case to match the real Etsy API v3.
 """
 
 from flask import Flask, request, jsonify
