@@ -25,113 +25,113 @@ def init_sample_data():
 
     # Sample shop
     mock_shops[12345678] = {
-        "shopId": 12345678,
-        "shopName": "TestShopName",
-        "userId": 87654321,
-        "createDate": 1234567890,
+        "shop_id": 12345678,
+        "shop_name": "TestShopName",
+        "user_id": 87654321,
+        "create_date": 1234567890,
         "title": "My Awesome Test Shop",
         "announcement": "Welcome to my shop!",
-        "currencyCode": "USD",
-        "isVacation": False,
-        "vacationMessage": None,
-        "saleMessage": "Thank you for your purchase!",
-        "digitalSaleMessage": "Thank you for your digital purchase!",
-        "updateDate": int(datetime.now().timestamp()),
-        "listingActiveCount": 5,
-        "digitalListingCount": 2,
-        "loginName": "testshopowner",
-        "acceptsCustomRequests": True,
-        "policyWelcome": "Welcome to my shop!",
-        "policyPayment": "We accept all major payment methods.",
-        "policyShipping": "Items ship within 1-3 business days.",
-        "policyRefunds": "Returns accepted within 30 days.",
-        "policyAdditional": "Please contact us with any questions.",
-        "policyPrivacy": "Your privacy is important to us.",
-        "vacationAutoreply": None,
+        "currency_code": "USD",
+        "is_vacation": False,
+        "vacation_message": None,
+        "sale_message": "Thank you for your purchase!",
+        "digital_sale_message": "Thank you for your digital purchase!",
+        "update_date": int(datetime.now().timestamp()),
+        "listing_active_count": 5,
+        "digital_listing_count": 2,
+        "login_name": "testshopowner",
+        "accepts_custom_requests": True,
+        "policy_welcome": "Welcome to my shop!",
+        "policy_payment": "We accept all major payment methods.",
+        "policy_shipping": "Items ship within 1-3 business days.",
+        "policy_refunds": "Returns accepted within 30 days.",
+        "policy_additional": "Please contact us with any questions.",
+        "policy_privacy": "Your privacy is important to us.",
+        "vacation_autoreply": None,
         "url": "https://www.etsy.com/shop/TestShopName",
-        "imageUrl760x100": "https://example.com/shop-banner.jpg",
-        "numFavorers": 150,
+        "image_url_760x100": "https://example.com/shop-banner.jpg",
+        "num_favorers": 150,
         "languages": ["en-US"],
-        "iconUrlFullxfull": "https://example.com/shop-icon.jpg",
-        "isUsingStructuredPolicies": True,
-        "hasOnboardedStructuredPolicies": True,
-        "hasUnstructuredPolicies": False,
-        "policyUpdateDate": int(datetime.now().timestamp()),
-        "shopLocationCountryIso": "US",
+        "icon_url_fullxfull": "https://example.com/shop-icon.jpg",
+        "is_using_structured_policies": True,
+        "has_onboarded_structured_policies": True,
+        "has_unstructured_policies": False,
+        "policy_update_date": int(datetime.now().timestamp()),
+        "shop_location_country_iso": "US",
     }
 
     # Sample receipts (orders)
     for i in range(1, 4):
         receipt_id = 1000000000 + i
         mock_receipts[receipt_id] = {
-            "receiptId": receipt_id,
-            "shopId": 12345678,
-            "receiptType": 0,
-            "sellerUserId": 87654321,
-            "sellerEmail": "seller@example.com",
-            "buyerUserId": 99999999 + i,
-            "buyerEmail": f"buyer{i}@example.com",
+            "receipt_id": receipt_id,
+            "shop_id": 12345678,
+            "receipt_type": 0,
+            "seller_user_id": 87654321,
+            "seller_email": "seller@example.com",
+            "buyer_user_id": 99999999 + i,
+            "buyer_email": f"buyer{i}@example.com",
             "name": f"Test Buyer {i}",
-            "firstLine": f"{100 + i} Main Street",
-            "secondLine": f"Apt {i}",
+            "first_line": f"{100 + i} Main Street",
+            "second_line": f"Apt {i}",
             "city": "New York",
             "state": "NY",
             "zip": "10001",
             "status": "paid" if i < 3 else "processing",
-            "formattedAddress": f"{100 + i} Main Street\nApt {i}\nNew York, NY 10001\nUnited States",
-            "countryIso": "US",
-            "paymentMethod": "paypal",
-            "paymentEmail": f"buyer{i}@example.com",
-            "messageFromSeller": None,
-            "messageFromBuyer": f"Please ship quickly! - Buyer {i}",
-            "messageFromPayment": None,
-            "isPaid": True,
-            "isShipped": i == 1,
-            "createTimestamp": int((datetime.now() - timedelta(days=i)).timestamp()),
-            "createdTimestamp": int((datetime.now() - timedelta(days=i)).timestamp()),
-            "updateTimestamp": int(datetime.now().timestamp()),
-            "updatedTimestamp": int(datetime.now().timestamp()),
-            "isGift": False,
-            "giftMessage": None,
+            "formatted_address": f"{100 + i} Main Street\nApt {i}\nNew York, NY 10001\nUnited States",
+            "country_iso": "US",
+            "payment_method": "paypal",
+            "payment_email": f"buyer{i}@example.com",
+            "message_from_seller": None,
+            "message_from_buyer": f"Please ship quickly! - Buyer {i}",
+            "message_from_payment": None,
+            "is_paid": True,
+            "is_shipped": i == 1,
+            "create_timestamp": int((datetime.now() - timedelta(days=i)).timestamp()),
+            "created_timestamp": int((datetime.now() - timedelta(days=i)).timestamp()),
+            "update_timestamp": int(datetime.now().timestamp()),
+            "updated_timestamp": int(datetime.now().timestamp()),
+            "is_gift": False,
+            "gift_message": None,
             "grandtotal": {
                 "amount": 2500 + (i * 500),
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
             "subtotal": {
                 "amount": 2000 + (i * 500),
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "totalPrice": {
+            "total_price": {
                 "amount": 2500 + (i * 500),
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "totalShippingCost": {
+            "total_shipping_cost": {
                 "amount": 500,
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "totalTaxCost": {
+            "total_tax_cost": {
                 "amount": 0,
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "totalVatCost": {
+            "total_vat_cost": {
                 "amount": 0,
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "discountAmt": {
+            "discount_amt": {
                 "amount": 0,
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "giftWrapPrice": {
+            "gift_wrap_price": {
                 "amount": 0,
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
             "shipments": [],
             "transactions": [],
@@ -141,63 +141,63 @@ def init_sample_data():
     for i in range(1, 6):
         listing_id = 2000000000 + i
         mock_listings[listing_id] = {
-            "listingId": listing_id,
-            "userId": 87654321,
-            "shopId": 12345678,
+            "listing_id": listing_id,
+            "user_id": 87654321,
+            "shop_id": 12345678,
             "title": f"Handmade Test Product {i}",
             "description": f"This is a beautiful handmade product number {i}. Made with love and care.",
             "state": "active",
-            "creationTimestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
-            "createdTimestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
-            "endingTimestamp": int((datetime.now() + timedelta(days=90)).timestamp()),
-            "originalCreationTimestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
-            "lastModifiedTimestamp": int(datetime.now().timestamp()),
-            "updatedTimestamp": int(datetime.now().timestamp()),
-            "stateTimestamp": int(datetime.now().timestamp()),
+            "creation_timestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
+            "created_timestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
+            "ending_timestamp": int((datetime.now() + timedelta(days=90)).timestamp()),
+            "original_creation_timestamp": int((datetime.now() - timedelta(days=30)).timestamp()),
+            "last_modified_timestamp": int(datetime.now().timestamp()),
+            "updated_timestamp": int(datetime.now().timestamp()),
+            "state_timestamp": int(datetime.now().timestamp()),
             "quantity": 10 + i,
-            "shopSectionId": 30000000 + i,
-            "featuredRank": -1,
+            "shop_section_id": 30000000 + i,
+            "featured_rank": -1,
             "url": f"https://www.etsy.com/listing/{listing_id}/handmade-test-product-{i}",
-            "numFavorers": 10 + (i * 5),
-            "nonTaxable": False,
-            "isTaxable": True,
-            "isCustomizable": i % 2 == 0,
-            "isPersonalizable": i % 2 == 0,
-            "personalizationIsRequired": False,
-            "personalizationCharCountMax": 50 if i % 2 == 0 else None,
-            "personalizationInstructions": "Please provide personalization details" if i % 2 == 0 else None,
-            "listingType": "physical",
+            "num_favorers": 10 + (i * 5),
+            "non_taxable": False,
+            "is_taxable": True,
+            "is_customizable": i % 2 == 0,
+            "is_personalizable": i % 2 == 0,
+            "personalization_is_required": False,
+            "personalization_char_count_max": 50 if i % 2 == 0 else None,
+            "personalization_instructions": "Please provide personalization details" if i % 2 == 0 else None,
+            "listing_type": "physical",
             "tags": ["handmade", "gift", f"product{i}"],
             "materials": ["wood", "fabric", "metal"],
-            "shippingProfileId": 40000000 + i,
-            "returnPolicyId": 50000000,
-            "processingMin": 1,
-            "processingMax": 3,
-            "whoMade": "i_did",
-            "whenMade": "made_to_order",
-            "isSupply": False,
-            "itemWeight": 100 + (i * 10),
-            "itemWeightUnit": "oz",
-            "itemLength": 5.0 + i,
-            "itemWidth": 3.0 + i,
-            "itemHeight": 2.0 + i,
-            "itemDimensionsUnit": "in",
-            "isPrivate": False,
+            "shipping_profile_id": 40000000 + i,
+            "return_policy_id": 50000000,
+            "processing_min": 1,
+            "processing_max": 3,
+            "who_made": "i_did",
+            "when_made": "made_to_order",
+            "is_supply": False,
+            "item_weight": 100 + (i * 10),
+            "item_weight_unit": "oz",
+            "item_length": 5.0 + i,
+            "item_width": 3.0 + i,
+            "item_height": 2.0 + i,
+            "item_dimensions_unit": "in",
+            "is_private": False,
             "style": ["Minimalist", "Modern"],
-            "fileData": "",
-            "hasVariations": False,
-            "shouldAutoRenew": True,
+            "file_data": "",
+            "has_variations": False,
+            "should_auto_renew": True,
             "language": "en-US",
             "price": {
                 "amount": 1500 + (i * 500),
                 "divisor": 100,
-                "currencyCode": "USD",
+                "currency_code": "USD",
             },
-            "taxonomyId": 1000 + i,
-            "productionPartners": [],
+            "taxonomy_id": 1000 + i,
+            "production_partners": [],
             "skus": [],
             "views": 100 + (i * 50),
-            "isDigital": i > 3,
+            "is_digital": i > 3,
         }
 
 
@@ -326,7 +326,7 @@ def get_shops_by_user(user_id):
     GET /v3/application/users/{user_id}/shops
     Requires: shops_r scope
     """
-    user_shops = [shop for shop in mock_shops.values() if shop['userId'] == user_id]
+    user_shops = [shop for shop in mock_shops.values() if shop['user_id'] == user_id]
 
     return jsonify({
         "count": len(user_shops),
@@ -347,7 +347,7 @@ def get_shop_receipts(shop_id):
         return jsonify({"error": "Shop not found"}), 404
 
     # Filter receipts by shop
-    shop_receipts = [r for r in mock_receipts.values() if r.get('shopId') == shop_id]
+    shop_receipts = [r for r in mock_receipts.values() if r.get('shop_id') == shop_id]
 
     # Handle pagination
     limit = int(request.args.get('limit', 25))
@@ -362,16 +362,16 @@ def get_shop_receipts(shop_id):
     filtered_receipts = shop_receipts
 
     if min_created:
-        filtered_receipts = [r for r in filtered_receipts if r['createTimestamp'] >= int(min_created)]
+        filtered_receipts = [r for r in filtered_receipts if r['create_timestamp'] >= int(min_created)]
     if max_created:
-        filtered_receipts = [r for r in filtered_receipts if r['createTimestamp'] <= int(max_created)]
+        filtered_receipts = [r for r in filtered_receipts if r['create_timestamp'] <= int(max_created)]
     if was_paid is not None:
-        filtered_receipts = [r for r in filtered_receipts if r['isPaid'] == (was_paid.lower() == 'true')]
+        filtered_receipts = [r for r in filtered_receipts if r['is_paid'] == (was_paid.lower() == 'true')]
     if was_shipped is not None:
-        filtered_receipts = [r for r in filtered_receipts if r['isShipped'] == (was_shipped.lower() == 'true')]
+        filtered_receipts = [r for r in filtered_receipts if r['is_shipped'] == (was_shipped.lower() == 'true')]
 
-    # Sort by createTimestamp descending
-    filtered_receipts.sort(key=lambda x: x['createTimestamp'], reverse=True)
+    # Sort by create_timestamp descending
+    filtered_receipts.sort(key=lambda x: x['create_timestamp'], reverse=True)
 
     # Apply pagination
     paginated_receipts = filtered_receipts[offset:offset + limit]
@@ -418,12 +418,12 @@ def update_receipt(shop_id, receipt_id):
 
     # Update allowed fields (request body uses snake_case query-style names)
     if 'was_shipped' in data:
-        receipt['isShipped'] = data['was_shipped']
+        receipt['is_shipped'] = data['was_shipped']
     if 'was_paid' in data:
-        receipt['isPaid'] = data['was_paid']
+        receipt['is_paid'] = data['was_paid']
 
-    receipt['updateTimestamp'] = int(datetime.now().timestamp())
-    receipt['updatedTimestamp'] = int(datetime.now().timestamp())
+    receipt['update_timestamp'] = int(datetime.now().timestamp())
+    receipt['updated_timestamp'] = int(datetime.now().timestamp())
 
     return jsonify(receipt)
 
@@ -440,8 +440,8 @@ def get_shop_listings(shop_id):
     if shop_id not in mock_shops:
         return jsonify({"error": "Shop not found"}), 404
 
-    # Filter listings by shopId
-    shop_listings = [listing for listing in mock_listings.values() if listing['shopId'] == shop_id]
+    # Filter listings by shop_id
+    shop_listings = [listing for listing in mock_listings.values() if listing['shop_id'] == shop_id]
 
     # Handle pagination
     limit = int(request.args.get('limit', 25))
@@ -452,8 +452,8 @@ def get_shop_listings(shop_id):
     if state:
         shop_listings = [l for l in shop_listings if l['state'] == state]
 
-    # Sort by listingId
-    shop_listings.sort(key=lambda x: x['listingId'], reverse=True)
+    # Sort by listing_id
+    shop_listings.sort(key=lambda x: x['listing_id'], reverse=True)
 
     # Apply pagination
     paginated_listings = shop_listings[offset:offset + limit]
@@ -506,31 +506,31 @@ def create_listing(shop_id):
     new_listing_id = max(mock_listings.keys()) + 1 if mock_listings else 2000000001
 
     new_listing = {
-        "listingId": new_listing_id,
-        "userId": request.token_info['user_id'],
-        "shopId": shop_id,
+        "listing_id": new_listing_id,
+        "user_id": request.token_info['user_id'],
+        "shop_id": shop_id,
         "title": data.get('title', 'New Listing'),
         "description": data.get('description', ''),
         "state": "active",
-        "creationTimestamp": int(datetime.now().timestamp()),
-        "createdTimestamp": int(datetime.now().timestamp()),
+        "creation_timestamp": int(datetime.now().timestamp()),
+        "created_timestamp": int(datetime.now().timestamp()),
         "quantity": data.get('quantity', 1),
-        "price": data.get('price', {"amount": 1000, "divisor": 100, "currencyCode": "USD"}),
-        "whoMade": data.get('who_made', 'i_did'),
-        "whenMade": data.get('when_made', 'made_to_order'),
-        "isSupply": data.get('is_supply', False),
-        "taxonomyId": data.get('taxonomy_id', 1),
-        "shippingProfileId": data.get('shipping_profile_id'),
-        "returnPolicyId": data.get('return_policy_id'),
-        "processingMin": data.get('processing_min', 1),
-        "processingMax": data.get('processing_max', 3),
+        "price": data.get('price', {"amount": 1000, "divisor": 100, "currency_code": "USD"}),
+        "who_made": data.get('who_made', 'i_did'),
+        "when_made": data.get('when_made', 'made_to_order'),
+        "is_supply": data.get('is_supply', False),
+        "taxonomy_id": data.get('taxonomy_id', 1),
+        "shipping_profile_id": data.get('shipping_profile_id'),
+        "return_policy_id": data.get('return_policy_id'),
+        "processing_min": data.get('processing_min', 1),
+        "processing_max": data.get('processing_max', 3),
         "tags": data.get('tags', []),
         "materials": data.get('materials', []),
-        "isCustomizable": data.get('is_customizable', False),
-        "isPersonalizable": data.get('is_personalizable', False),
-        "listingType": data.get('type', 'physical'),
-        "shouldAutoRenew": data.get('should_auto_renew', True),
-        "isTaxable": data.get('is_taxable', True),
+        "is_customizable": data.get('is_customizable', False),
+        "is_personalizable": data.get('is_personalizable', False),
+        "listing_type": data.get('type', 'physical'),
+        "should_auto_renew": data.get('should_auto_renew', True),
+        "is_taxable": data.get('is_taxable', True),
         "url": f"https://www.etsy.com/listing/{new_listing_id}/",
     }
 
@@ -556,29 +556,19 @@ def update_listing(shop_id, listing_id):
     data = request.get_json()
     listing = mock_listings[listing_id]
 
-    # Map snake_case request body fields to camelCase listing fields
-    field_map = {
-        'title': 'title',
-        'description': 'description',
-        'quantity': 'quantity',
-        'price': 'price',
-        'state': 'state',
-        'tags': 'tags',
-        'materials': 'materials',
-        'is_customizable': 'isCustomizable',
-        'is_personalizable': 'isPersonalizable',
-        'processing_min': 'processingMin',
-        'processing_max': 'processingMax',
-        'taxonomy_id': 'taxonomyId',
-        'shipping_profile_id': 'shippingProfileId',
-    }
+    # Map request body fields to listing fields (both use snake_case)
+    updatable_fields = [
+        'title', 'description', 'quantity', 'price', 'state', 'tags',
+        'materials', 'is_customizable', 'is_personalizable',
+        'processing_min', 'processing_max', 'taxonomy_id', 'shipping_profile_id',
+    ]
 
-    for src, dst in field_map.items():
-        if src in data:
-            listing[dst] = data[src]
+    for field in updatable_fields:
+        if field in data:
+            listing[field] = data[field]
 
-    listing['lastModifiedTimestamp'] = int(datetime.now().timestamp())
-    listing['updatedTimestamp'] = int(datetime.now().timestamp())
+    listing['last_modified_timestamp'] = int(datetime.now().timestamp())
+    listing['updated_timestamp'] = int(datetime.now().timestamp())
 
     return jsonify(listing)
 

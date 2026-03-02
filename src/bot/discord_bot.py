@@ -75,12 +75,12 @@ class ShopkeepBot(discord.Client):
             await db.upsert_shop(conn, shop_data)
             await db.upsert_listings(conn, listings)
             for receipt in receipts:
-                receipt.setdefault("shopId", ETSY_SHOP_ID)
+                receipt.setdefault("shop_id", ETSY_SHOP_ID)
                 await db.upsert_receipt(conn, receipt, already_seen=True)
             await conn.commit()
 
         print(
-            f"[bootstrap] Done — shop '{shop_data.get('shopName')}', "
+            f"[bootstrap] Done — shop '{shop_data.get('shop_name')}', "
             f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
         )
 
@@ -109,26 +109,26 @@ class ShopkeepBot(discord.Client):
             None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=50)
         )
         receipts = response.get("results", [])
-        shop_name = shop_data.get("shopName", "My Shop")
+        shop_name = shop_data.get("shop_name", "My Shop")
 
         if not receipts:
             await message.channel.send("No orders found.")
             return
 
         for receipt in receipts:
-            # Map camelCase API keys to the snake_case keys build_order_embed expects
+            # Map API fields (snake_case) to the keys build_order_embed expects
             gt = receipt.get("grandtotal", {})
             normalized = {
-                "receipt_id": receipt.get("receiptId"),
+                "receipt_id": receipt.get("receipt_id"),
                 "name": receipt.get("name"),
                 "status": receipt.get("status"),
-                "is_paid": receipt.get("isPaid"),
-                "is_shipped": receipt.get("isShipped"),
-                "gift_message": receipt.get("giftMessage"),
-                "create_timestamp": receipt.get("createTimestamp"),
+                "is_paid": receipt.get("is_paid"),
+                "is_shipped": receipt.get("is_shipped"),
+                "gift_message": receipt.get("gift_message"),
+                "create_timestamp": receipt.get("create_timestamp"),
                 "grandtotal_amount": gt.get("amount", 0),
                 "grandtotal_divisor": gt.get("divisor", 100),
-                "grandtotal_currency": gt.get("currencyCode", "USD"),
+                "grandtotal_currency": gt.get("currency_code", "USD"),
             }
             embed = build_order_embed(normalized, shop_name=shop_name)
             await message.channel.send(embed=embed)
@@ -145,13 +145,13 @@ class ShopkeepBot(discord.Client):
         )
         receipts = response.get("results", [])
         channel = self.get_channel(ORDER_CHANNEL_ID)
-        shop_name = shop_data.get("shopName", "My Shop")
+        shop_name = shop_data.get("shop_name", "My Shop")
 
         async with await db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
             for receipt in receipts:
-                # Ensure shopId is present (real API includes it; inject as fallback)
-                receipt.setdefault("shopId", ETSY_SHOP_ID)
+                # Ensure shop_id is present (real API includes it; inject as fallback)
+                receipt.setdefault("shop_id", ETSY_SHOP_ID)
                 await db.upsert_receipt(conn, receipt)
             await conn.commit()
 
