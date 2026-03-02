@@ -58,6 +58,10 @@ def init_sample_data():
         "has_unstructured_policies": False,
         "policy_update_date": int(datetime.now().timestamp()),
         "shop_location_country_iso": "US",
+        "location": "Chico, CA",
+        "transaction_sold_count": 42,
+        "review_count": 18,
+        "review_average": 4.9,
     }
 
     # Sample receipts (orders)

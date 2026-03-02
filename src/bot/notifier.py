@@ -8,6 +8,35 @@ from datetime import datetime, timezone
 import discord
 
 
+def build_shop_embed(shop: dict) -> discord.Embed:
+    """Build a Discord embed for shop info from an API shop dict."""
+    name = shop.get("shop_name", "Shop")
+    url = shop.get("url")
+
+    embed = discord.Embed(
+        title=name,
+        url=url,
+        color=discord.Color.blurple(),
+    )
+
+    if location := shop.get("location"):
+        embed.add_field(name="Location", value=location, inline=True)
+
+    sales = shop.get("transaction_sold_count")
+    if sales is not None:
+        embed.add_field(name="Sales", value=str(sales), inline=True)
+
+    review_avg = shop.get("review_average")
+    review_count = shop.get("review_count")
+    if review_avg is not None:
+        value = f"{review_avg:.1f} ★"
+        if review_count is not None:
+            value += f" ({review_count} reviews)"
+        embed.add_field(name="Rating", value=value, inline=True)
+
+    return embed
+
+
 def build_order_embed(receipt: dict, shop_name: str) -> discord.Embed:
     """
     Build a green Discord embed for a new order notification.
