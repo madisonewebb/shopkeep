@@ -96,6 +96,43 @@ class ShopkeepBot(discord.Client):
     async def before_poll(self):
         await self.wait_until_ready()
 
+    async def on_message(self, message: discord.Message):
+        if message.author == self.user:
+            return
+        if message.content.strip().lower() != "!orders":
+            return
+
+        await self._ensure_etsy_auth()
+        loop = asyncio.get_running_loop()
+        shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
+        response = await loop.run_in_executor(
+            None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=50)
+        )
+        receipts = response.get("results", [])
+        shop_name = shop_data.get("shopName", "My Shop")
+
+        if not receipts:
+            await message.channel.send("No orders found.")
+            return
+
+        for receipt in receipts:
+            # Map camelCase API keys to the snake_case keys build_order_embed expects
+            gt = receipt.get("grandtotal", {})
+            normalized = {
+                "receipt_id": receipt.get("receiptId"),
+                "name": receipt.get("name"),
+                "status": receipt.get("status"),
+                "is_paid": receipt.get("isPaid"),
+                "is_shipped": receipt.get("isShipped"),
+                "gift_message": receipt.get("giftMessage"),
+                "create_timestamp": receipt.get("createTimestamp"),
+                "grandtotal_amount": gt.get("amount", 0),
+                "grandtotal_divisor": gt.get("divisor", 100),
+                "grandtotal_currency": gt.get("currencyCode", "USD"),
+            }
+            embed = build_order_embed(normalized, shop_name=shop_name)
+            await message.channel.send(embed=embed)
+
     async def _do_poll(self):
         loop = asyncio.get_running_loop()
 
