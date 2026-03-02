@@ -19,4 +19,6 @@ USER apiuser
 
 EXPOSE 5000
 
-CMD ["python", "-m", "src.etsy.mock_api"]
+ENV FLASK_APP=src/etsy/mock_api.py
+
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5000", "--reload"]
