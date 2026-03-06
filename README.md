@@ -2,195 +2,102 @@
 
 [![Deploy](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml/badge.svg)](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml)
 
-Shopkeep is a Discord bot that integrates with the Etsy API to deliver real-time shop order notifications directly into a Discord server.
+A Discord bot that posts Etsy order notifications to your server.
 
 ---
 
-## Features
+## What it does
 
-- Real-time Etsy order notifications via Discord embeds
-- Order polling every 60 seconds (configurable)
-- SQLite persistence for orders, shops, and listings
-- Mock Etsy API for development without live credentials
-- Kubernetes deployment with k3s and Kustomize
+- Polls your Etsy shop every 60 seconds for new orders
+- Posts order notifications to a Discord channel as embeds
+- Persists shop, listing, and order data in SQLite
 
----
+## Bot commands
 
-## Tech Stack
+| Command | Description |
+|---|---|
+| `!shop` | Shows your shop name, location, total sales, and rating |
+| `!orders` | Lists open orders with buyer, total, and shipping status |
 
-- **Python** — backend and bot logic
-- **discord.py** — Discord API integration
-- **Etsy API** — shop, order, and listing data
-- **SQLite** — async data persistence via aiosqlite
-- **Docker** — containerized development and deployment
-- **Tilt** — local container orchestration
-- **Kubernetes / k3s** — production deployment
-- **Kustomize** — Kubernetes manifest management
-- **GitHub Actions** — CI/CD
+See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
 
 ---
 
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DISCORD_BOT_TOKEN` | Yes | — | Discord bot token |
-| `ORDER_CHANNEL_ID` | Yes | `0` | Discord channel ID for order notifications |
-| `ETSY_API_URL` | No | `http://localhost:5000` | Etsy API base URL |
-| `ETSY_SHOP_ID` | No | `12345678` | Shop ID to monitor |
-| `POLL_INTERVAL_SECS` | No | `60` | Order polling frequency in seconds |
-| `DB_PATH` | No | `./shopkeep.db` | SQLite database path |
-
----
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Python 3.10+
-- [Task](https://taskfile.dev/) — task runner
-- Discord bot token ([get one here](https://discord.com/developers/applications))
-- **OR** Docker & [Tilt](https://tilt.dev/) for containerized development
+- Docker & [Tilt](https://tilt.dev/)
+- Discord bot token ([create one here](https://discord.com/developers/applications))
 
-### Option 1: Tilt (Recommended)
+### Run locally
 
-1. **Clone the repository:**
+1. Clone the repo:
 
    ```bash
    git clone https://github.com/madisonewebb/shopkeep.git
    cd shopkeep
    ```
 
-2. **Set up environment variables:**
+2. Set up your environment:
 
    ```bash
    cp .env.example .env
    # Fill in DISCORD_BOT_TOKEN and ORDER_CHANNEL_ID
    ```
 
-3. **Start Tilt:**
+3. Start everything:
 
    ```bash
    tilt up
    ```
 
-   This will build the Docker images, start the mock Etsy API and bot, and watch for file changes with auto-reload.
+   This builds the Docker images, starts the mock Etsy API and the bot, and watches for file changes with auto-reload.
 
-4. **Stop Tilt:**
+4. To stop:
 
    ```bash
    tilt down
    ```
 
-### Option 2: Docker Compose
+### Environment variables
 
-1. **Clone and configure:**
-
-   ```bash
-   git clone https://github.com/madisonewebb/shopkeep.git
-   cd shopkeep
-   cp .env.example .env
-   ```
-
-2. **Start services:**
-
-   ```bash
-   docker compose up
-   ```
-
-### Option 3: Local Python
-
-1. **Install dependencies:**
-
-   ```bash
-   task install-dev
-   ```
-
-2. **Set up environment variables:**
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Install pre-commit hooks:**
-
-   ```bash
-   task setup-hooks
-   ```
-
-4. **Run the bot:**
-
-   ```bash
-   task run
-   ```
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DISCORD_BOT_TOKEN` | Yes | — | Discord bot token |
+| `ORDER_CHANNEL_ID` | Yes | — | Discord channel ID for notifications |
+| `ETSY_API_URL` | No | `http://localhost:5000` | Etsy API base URL |
+| `ETSY_SHOP_ID` | No | `12345678` | Shop ID to monitor |
+| `POLL_INTERVAL_SECS` | No | `60` | Polling frequency in seconds |
+| `DB_PATH` | No | `./shopkeep.db` | SQLite database path |
 
 ---
 
 ## Mock Etsy API
 
-While waiting for your Etsy API key activation, use the included mock Etsy API server for development and testing.
+A mock Etsy API is included so you can develop without real credentials.
 
-1. **Start the mock API server:**
+Tilt starts it automatically, or you can run it manually:
 
-   ```bash
-   task mock-api
-   ```
-
-   Server runs on `http://localhost:5000`
-
-2. **Test the mock API:**
-
-   ```bash
-   task test-mock-api
-   ```
+```bash
+task mock-api   # runs on http://localhost:5000
+```
 
 See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for full documentation.
 
 ---
 
-## Development
-
-### Available Tasks
-
-```bash
-task help
-```
-
-| Command | Description |
-|---|---|
-| `task install` | Install production dependencies |
-| `task install-dev` | Install all dependencies |
-| `task setup-hooks` | Install pre-commit git hooks |
-| `task run` | Run the Discord bot |
-| `task mock-api` | Run the mock Etsy API server |
-| `task test-mock-api` | Test the mock Etsy API |
-| `task format` | Auto-format code (ruff + black) |
-| `task lint` | Run all linters |
-| `task pre-commit` | Run pre-commit on all files |
-| `task clean` | Clean Python cache files |
-
-### Code Quality
-
-- **ruff** — fast Python linter
-- **black** — code formatting
-- **mypy** — type checking
-- **pre-commit** — git hooks for automatic checks
-
----
-
 ## Deployment
 
-The production deployment targets a k3s cluster via GitHub Actions on push to `main`.
+Pushes to `main` trigger a GitHub Actions deploy to a k3s cluster.
 
 - Docker images are published to GHCR: `ghcr.io/madisonewebb/shopkeep`
-- Kubernetes manifests are applied via Kustomize from `manifests/`
-- The SQLite PVC (`manifests/pvc.yaml`) must be applied manually before first deploy:
+- Manifests are applied via Kustomize from `manifests/`
+- Before the first deploy, apply the SQLite PVC manually:
 
   ```bash
   kubectl apply -f manifests/pvc.yaml
   ```
-
-See [`docker/README.md`](docker/README.md) for container-specific documentation.
 
 ---
 
@@ -199,7 +106,5 @@ See [`docker/README.md`](docker/README.md) for container-specific documentation.
 Shopkeep is not affiliated with or endorsed by Etsy or Discord. This project is for educational use.
 
 ---
-
-## Author
 
 **Madison Webb**
