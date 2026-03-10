@@ -89,6 +89,7 @@ class ShopkeepBot(discord.Client):
         print(f"Logged in as {self.user} | {len(self.etsy_clients)} shop(s) connected")
         if not self._bootstrapped:
             self._bootstrapped = True
+            await self._register_existing_guilds()
             async with await db.get_db() as conn:
                 guild_rows = await db.get_connected_guilds(conn)
             for row in guild_rows:
@@ -97,6 +98,32 @@ class ShopkeepBot(discord.Client):
                 except Exception as exc:
                     print(f"[bootstrap] guild={row['guild_id']} {exc}")
             self.poll_orders.start()
+
+    async def _register_existing_guilds(self) -> None:
+        """Create guild rows for any Discord servers the bot is already in but hasn't seen before.
+        This handles guilds that were joined before multi-tenant support, or while the bot was offline.
+        """
+        for guild in self.guilds:
+            async with await db.get_db() as conn:
+                existing = await db.get_guild(conn, guild.id)
+                if existing:
+                    continue
+                setup_token = secrets.token_urlsafe(16)
+                setup_token_exp = int(time.time()) + SETUP_TOKEN_TTL
+                await db.create_guild(conn, guild.id, guild.name, setup_token, setup_token_exp)
+                await conn.commit()
+
+            print(f"[register] New guild found: '{guild.name}' ({guild.id})")
+            if WEB_BASE_URL and guild.owner:
+                try:
+                    await guild.owner.send(
+                        f"Hi! Shopkeep needs to be connected to your Etsy shop for **{guild.name}**.\n\n"
+                        f"Complete setup here:\n"
+                        f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
+                        f"After connecting, use `!setchannel` to choose where order notifications go."
+                    )
+                except discord.Forbidden:
+                    pass
 
     async def on_guild_join(self, guild: discord.Guild):
         setup_token = secrets.token_urlsafe(16)

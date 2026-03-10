@@ -6,7 +6,7 @@
 - Rewrote `src/etsy/client.py` as `EtsyClient` targeting the real Etsy API v3
 - OAuth 2.0 PKCE flow, auto token refresh, 429 rate limit handling
 - Added `tokens` table to SQLite DB for token persistence
-- Created `scripts/etsy_auth.py` — one-time setup script for non-developers
+- Created `scripts/etsy_auth.py` — one-time CLI setup script (dev/local use only; replaced by website in production)
 
 ### 2. Multi-Tenant Support (`multi-tenant` branch)
 - **DB**: Added `guilds` and `etsy_tokens` tables for per-guild shop connections
