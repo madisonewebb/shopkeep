@@ -6,5 +6,4 @@ namespace: shopkeep
 resources:
   - deployment.yaml
   - web-deployment.yaml
-  - ingress.yaml
   - mock-etsy-deployment.yaml
