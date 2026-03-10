@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 
 import discord
 from discord.ext import tasks
@@ -7,12 +8,13 @@ from dotenv import load_dotenv
 
 from src.bot import db
 from src.bot.notifier import build_order_embed, build_shop_embed
-from src.etsy.client import MockEtsyClient
+from src.etsy.client import EtsyClient
 
 load_dotenv()
 
-ETSY_API_URL = os.getenv("ETSY_API_URL", "http://localhost:5000")
-ETSY_SHOP_ID = int(os.getenv("ETSY_SHOP_ID", "12345678"))
+ETSY_API_KEY = os.environ["ETSY_API_KEY"]
+ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
+ETSY_SHOP_ID = int(os.environ["ETSY_SHOP_ID"])
 ORDER_CHANNEL_ID = int(os.getenv("ORDER_CHANNEL_ID", "0"))
 POLL_INTERVAL_SECS = int(os.getenv("POLL_INTERVAL_SECS", "60"))
 DB_PATH_ENV = os.getenv("DB_PATH", "./shopkeep.db")
@@ -23,14 +25,50 @@ class ShopkeepBot(discord.Client):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(intents=intents)
-        self.etsy = MockEtsyClient(base_url=ETSY_API_URL)
-        self._etsy_authed = False
+        self.etsy: EtsyClient | None = None
         self._bootstrapped = False
 
     async def setup_hook(self):
         """Called by discord.py before login; event loop is already running."""
         db.DB_PATH = DB_PATH_ENV
         await db.init_db()
+
+        # Load tokens from DB, falling back to env vars on first run
+        loop = asyncio.get_running_loop()
+        async with await db.get_db() as conn:
+            stored = await db.load_tokens(conn)
+
+        if stored:
+            access_token = stored["access_token"]
+            refresh_token = stored["refresh_token"]
+            expires_at = stored["expires_at"]
+        else:
+            access_token = os.environ["ETSY_ACCESS_TOKEN"]
+            refresh_token = os.environ["ETSY_REFRESH_TOKEN"]
+            expires_at = int(time.time())  # force refresh on first call
+
+        self.etsy = EtsyClient(
+            api_key=ETSY_API_KEY,
+            shared_secret=ETSY_SHARED_SECRET,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_at=expires_at,
+            on_token_refresh=self._make_token_refresh_callback(loop),
+        )
+
+    def _make_token_refresh_callback(self, loop: asyncio.AbstractEventLoop):
+        def callback(access_token: str, refresh_token: str, expires_at: int):
+            asyncio.run_coroutine_threadsafe(
+                self._save_tokens(access_token, refresh_token, expires_at), loop
+            )
+
+        return callback
+
+    async def _save_tokens(
+        self, access_token: str, refresh_token: str, expires_at: int
+    ) -> None:
+        async with await db.get_db() as conn:
+            await db.save_tokens(conn, access_token, refresh_token, expires_at)
 
     async def on_ready(self):
         print(f"Logged in as {self.user} | Polling shop {ETSY_SHOP_ID} every {POLL_INTERVAL_SECS}s")
@@ -41,12 +79,6 @@ class ShopkeepBot(discord.Client):
             except Exception as exc:
                 print(f"[bootstrap] {exc}")
 
-    async def _ensure_etsy_auth(self):
-        if not self._etsy_authed:
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, self.etsy.get_access_token)
-            self._etsy_authed = True
-
     async def _bootstrap(self):
         """Seed the DB with current shop state on first connect.
 
@@ -56,8 +88,6 @@ class ShopkeepBot(discord.Client):
         """
         print(f"[bootstrap] Seeding shop {ETSY_SHOP_ID}…")
         loop = asyncio.get_running_loop()
-
-        await self._ensure_etsy_auth()
 
         shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
         listings_resp = await loop.run_in_executor(
@@ -87,7 +117,6 @@ class ShopkeepBot(discord.Client):
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
         try:
-            await self._ensure_etsy_auth()
             await self._do_poll()
         except Exception as exc:
             print(f"[poller] {exc}")
@@ -103,7 +132,6 @@ class ShopkeepBot(discord.Client):
         cmd = message.content.strip().lower()
 
         if cmd == "!shop":
-            await self._ensure_etsy_auth()
             loop = asyncio.get_running_loop()
             shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
             embed = build_shop_embed(shop_data)
@@ -113,7 +141,6 @@ class ShopkeepBot(discord.Client):
         if cmd != "!orders":
             return
 
-        await self._ensure_etsy_auth()
         loop = asyncio.get_running_loop()
         shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
         response = await loop.run_in_executor(
@@ -127,7 +154,6 @@ class ShopkeepBot(discord.Client):
             return
 
         for receipt in receipts:
-            # Map API fields (snake_case) to the keys build_order_embed expects
             gt = receipt.get("grandtotal", {})
             normalized = {
                 "receipt_id": receipt.get("receipt_id"),
@@ -147,7 +173,6 @@ class ShopkeepBot(discord.Client):
     async def _do_poll(self):
         loop = asyncio.get_running_loop()
 
-        # Fetch shop info so we can upsert it (satisfies FK constraint) and get shop name
         shop_data = await loop.run_in_executor(
             None, lambda: self.etsy.get_shop(ETSY_SHOP_ID)
         )
@@ -161,7 +186,6 @@ class ShopkeepBot(discord.Client):
         async with await db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
             for receipt in receipts:
-                # Ensure shop_id is present (real API includes it; inject as fallback)
                 receipt.setdefault("shop_id", ETSY_SHOP_ID)
                 await db.upsert_receipt(conn, receipt)
             await conn.commit()
@@ -172,7 +196,7 @@ class ShopkeepBot(discord.Client):
                     embed = build_order_embed(dict(row), shop_name=shop_name)
                     await channel.send(embed=embed)
                 await db.mark_receipt_notified(conn, row["receipt_id"])
-                await conn.commit()  # commit after each to avoid re-notifying on crash
+                await conn.commit()
 
 
 token = os.getenv("DISCORD_BOT_TOKEN")

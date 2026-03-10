@@ -96,6 +96,16 @@ CREATE TABLE IF NOT EXISTS receipts (
 """
 
 
+_CREATE_TOKENS = """
+CREATE TABLE IF NOT EXISTS tokens (
+    id            INTEGER PRIMARY KEY CHECK (id = 1),
+    access_token  TEXT    NOT NULL,
+    refresh_token TEXT    NOT NULL,
+    expires_at    INTEGER NOT NULL
+)
+"""
+
+
 async def init_db() -> None:
     """Create all tables if they don't exist."""
     async with aiosqlite.connect(DB_PATH) as db:
@@ -104,6 +114,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_SHOPS)
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
+        await db.execute(_CREATE_TOKENS)
         await db.commit()
 
 
@@ -277,3 +288,26 @@ async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> No
         "UPDATE receipts SET notified_at = ? WHERE receipt_id = ?",
         (int(time.time()), receipt_id),
     )
+
+
+async def load_tokens(db: aiosqlite.Connection) -> dict | None:
+    """Return the stored OAuth tokens, or None if not yet seeded."""
+    cursor = await db.execute(
+        "SELECT access_token, refresh_token, expires_at FROM tokens WHERE id = 1"
+    )
+    row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def save_tokens(
+    db: aiosqlite.Connection, access_token: str, refresh_token: str, expires_at: int
+) -> None:
+    """Upsert the singleton token row and commit."""
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO tokens (id, access_token, refresh_token, expires_at)
+        VALUES (1, ?, ?, ?)
+        """,
+        (access_token, refresh_token, expires_at),
+    )
+    await db.commit()
