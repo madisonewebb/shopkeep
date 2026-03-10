@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connected! — Shopkeep</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9f6f2; color: #333; }
+    .card { max-width: 480px; margin: 80px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,.08); text-align: center; }
+    .icon { font-size: 3rem; margin-bottom: 16px; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; }
+    p { color: #555; line-height: 1.6; margin-bottom: 16px; }
+    code { background: #f4f4f4; padding: 2px 7px; border-radius: 4px; font-size: .95em; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>{{ shop_name }} is connected!</h1>
+    <p>Shopkeep is now monitoring your Etsy shop for new orders.</p>
+    <p>Go to Discord and type <code>!setchannel</code> in the channel where you want order notifications to appear.</p>
+    <p>You can also use <code>!shop</code> to see your shop info and <code>!orders</code> to list recent orders.</p>
+  </div>
+</body>
+</html>

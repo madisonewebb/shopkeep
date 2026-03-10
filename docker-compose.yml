@@ -1,23 +1,4 @@
 services:
-  mock-etsy-api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.etsy
-    container_name: shopkeep-mock-api
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./src/etsy:/app/src/etsy:ro
-    networks:
-      - shopkeep-network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/v3/application/openapi-ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
   bot:
     build:
       context: .
@@ -28,9 +9,10 @@ services:
       - .env
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      - ETSY_API_URL=http://mock-etsy-api:5000
-      - ETSY_SHOP_ID=${ETSY_SHOP_ID:-12345678}
-      - ORDER_CHANNEL_ID=${ORDER_CHANNEL_ID}
+      - ETSY_API_KEY=${ETSY_API_KEY}
+      - ETSY_SHARED_SECRET=${ETSY_SHARED_SECRET}
+      - WEB_BASE_URL=${WEB_BASE_URL}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - POLL_INTERVAL_SECS=${POLL_INTERVAL_SECS:-60}
       - DB_PATH=/app/data/shopkeep.db
     volumes:
@@ -38,9 +20,45 @@ services:
       - shopkeep_data:/app/data
     networks:
       - shopkeep-network
-    depends_on:
-      mock-etsy-api:
-        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    container_name: shopkeep-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ETSY_API_KEY=${ETSY_API_KEY}
+      - ETSY_SHARED_SECRET=${ETSY_SHARED_SECRET}
+      - ETSY_WEB_REDIRECT_URI=${ETSY_WEB_REDIRECT_URI}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - WEB_BASE_URL=${WEB_BASE_URL}
+      - DB_PATH=/app/data/shopkeep.db
+      - PORT=8080
+    volumes:
+      - ./src:/app/src:ro
+      - shopkeep_data:/app/data
+    ports:
+      - "8080:8080"
+    networks:
+      - shopkeep-network
+
+  mock-etsy-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.etsy
+    container_name: shopkeep-mock-api
+    restart: unless-stopped
+    profiles:
+      - dev
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./src/etsy:/app/src/etsy:ro
+    networks:
+      - shopkeep-network
 
 networks:
   shopkeep-network:

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import secrets
 import time
 
 import discord
@@ -14,87 +15,127 @@ load_dotenv()
 
 ETSY_API_KEY = os.environ["ETSY_API_KEY"]
 ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
-ETSY_SHOP_ID = int(os.environ["ETSY_SHOP_ID"])
-ORDER_CHANNEL_ID = int(os.getenv("ORDER_CHANNEL_ID", "0"))
 POLL_INTERVAL_SECS = int(os.getenv("POLL_INTERVAL_SECS", "60"))
 DB_PATH_ENV = os.getenv("DB_PATH", "./shopkeep.db")
+WEB_BASE_URL = os.getenv("WEB_BASE_URL", "")
+
+SETUP_TOKEN_TTL = 86400  # 24 hours
 
 
 class ShopkeepBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.guilds = True
         super().__init__(intents=intents)
-        self.etsy: EtsyClient | None = None
+        # guild_id -> EtsyClient, populated on startup and when new guilds connect
+        self.etsy_clients: dict[int, EtsyClient] = {}
         self._bootstrapped = False
 
     async def setup_hook(self):
-        """Called by discord.py before login; event loop is already running."""
         db.DB_PATH = DB_PATH_ENV
         await db.init_db()
 
-        # Load tokens from DB, falling back to env vars on first run
         loop = asyncio.get_running_loop()
         async with await db.get_db() as conn:
-            stored = await db.load_tokens(conn)
+            guilds = await db.get_connected_guilds(conn)
+            for guild_row in guilds:
+                tokens = await db.get_guild_tokens(conn, guild_row["guild_id"])
+                if tokens:
+                    self._register_client(
+                        loop,
+                        guild_row["guild_id"],
+                        tokens["access_token"],
+                        tokens["refresh_token"],
+                        tokens["expires_at"],
+                    )
 
-        if stored:
-            access_token = stored["access_token"]
-            refresh_token = stored["refresh_token"]
-            expires_at = stored["expires_at"]
-        else:
-            access_token = os.environ["ETSY_ACCESS_TOKEN"]
-            refresh_token = os.environ["ETSY_REFRESH_TOKEN"]
-            expires_at = int(time.time())  # force refresh on first call
-
-        self.etsy = EtsyClient(
+    def _register_client(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        guild_id: int,
+        access_token: str,
+        refresh_token: str,
+        expires_at: int,
+    ) -> EtsyClient:
+        client = EtsyClient(
             api_key=ETSY_API_KEY,
             shared_secret=ETSY_SHARED_SECRET,
             access_token=access_token,
             refresh_token=refresh_token,
             expires_at=expires_at,
-            on_token_refresh=self._make_token_refresh_callback(loop),
+            on_token_refresh=self._make_refresh_callback(loop, guild_id),
         )
+        self.etsy_clients[guild_id] = client
+        return client
 
-    def _make_token_refresh_callback(self, loop: asyncio.AbstractEventLoop):
+    def _make_refresh_callback(self, loop: asyncio.AbstractEventLoop, guild_id: int):
         def callback(access_token: str, refresh_token: str, expires_at: int):
             asyncio.run_coroutine_threadsafe(
-                self._save_tokens(access_token, refresh_token, expires_at), loop
+                self._save_guild_tokens(guild_id, access_token, refresh_token, expires_at),
+                loop,
             )
-
         return callback
 
-    async def _save_tokens(
-        self, access_token: str, refresh_token: str, expires_at: int
+    async def _save_guild_tokens(
+        self, guild_id: int, access_token: str, refresh_token: str, expires_at: int
     ) -> None:
         async with await db.get_db() as conn:
-            await db.save_tokens(conn, access_token, refresh_token, expires_at)
+            await db.save_guild_tokens(conn, guild_id, access_token, refresh_token, expires_at)
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def on_ready(self):
-        print(f"Logged in as {self.user} | Polling shop {ETSY_SHOP_ID} every {POLL_INTERVAL_SECS}s")
+        print(f"Logged in as {self.user} | {len(self.etsy_clients)} shop(s) connected")
         if not self._bootstrapped:
             self._bootstrapped = True
+            async with await db.get_db() as conn:
+                guild_rows = await db.get_connected_guilds(conn)
+            for row in guild_rows:
+                try:
+                    await self._bootstrap_guild(row["guild_id"], row["etsy_shop_id"])
+                except Exception as exc:
+                    print(f"[bootstrap] guild={row['guild_id']} {exc}")
+            self.poll_orders.start()
+
+    async def on_guild_join(self, guild: discord.Guild):
+        setup_token = secrets.token_urlsafe(16)
+        setup_token_exp = int(time.time()) + SETUP_TOKEN_TTL
+
+        async with await db.get_db() as conn:
+            await db.create_guild(conn, guild.id, guild.name, setup_token, setup_token_exp)
+            await conn.commit()
+
+        print(f"[guild_join] Joined '{guild.name}' ({guild.id})")
+
+        if WEB_BASE_URL and guild.owner:
             try:
-                await self._bootstrap()
-            except Exception as exc:
-                print(f"[bootstrap] {exc}")
+                await guild.owner.send(
+                    f"Thanks for adding Shopkeep to **{guild.name}**!\n\n"
+                    f"Connect your Etsy shop to start receiving order notifications:\n"
+                    f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
+                    f"After connecting, use `!setchannel` in any channel to choose "
+                    f"where order notifications are posted."
+                )
+            except discord.Forbidden:
+                pass  # Owner has DMs disabled
 
-    async def _bootstrap(self):
-        """Seed the DB with current shop state on first connect.
+    # ── Bootstrap ─────────────────────────────────────────────────────────────
 
-        Upserts the shop, all active listings, and all existing receipts.
-        Receipts are marked already_seen=True so the poll loop only notifies
-        for orders that arrive after the bot starts.
-        """
-        print(f"[bootstrap] Seeding shop {ETSY_SHOP_ID}…")
+    async def _bootstrap_guild(self, guild_id: int, shop_id: int) -> None:
+        etsy = self.etsy_clients.get(guild_id)
+        if not etsy:
+            return
+
+        print(f"[bootstrap] guild={guild_id} shop={shop_id}")
         loop = asyncio.get_running_loop()
 
-        shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
+        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
         listings_resp = await loop.run_in_executor(
-            None, lambda: self.etsy.get_shop_listings(ETSY_SHOP_ID, limit=100)
+            None, lambda: etsy.get_shop_listings(shop_id, limit=100)
         )
         receipts_resp = await loop.run_in_executor(
-            None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=100)
+            None, lambda: etsy.get_shop_receipts(shop_id, limit=100)
         )
 
         listings = listings_resp.get("results", [])
@@ -104,47 +145,132 @@ class ShopkeepBot(discord.Client):
             await db.upsert_shop(conn, shop_data)
             await db.upsert_listings(conn, listings)
             for receipt in receipts:
-                receipt.setdefault("shop_id", ETSY_SHOP_ID)
+                receipt.setdefault("shop_id", shop_id)
                 await db.upsert_receipt(conn, receipt, already_seen=True)
             await conn.commit()
 
         print(
-            f"[bootstrap] Done — shop '{shop_data.get('shop_name')}', "
+            f"[bootstrap] Done — '{shop_data.get('shop_name')}', "
             f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
         )
-        self.poll_orders.start()
+
+    # ── Poll loop ─────────────────────────────────────────────────────────────
 
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
-        try:
-            await self._do_poll()
-        except Exception as exc:
-            print(f"[poller] {exc}")
+        async with await db.get_db() as conn:
+            guild_rows = await db.get_connected_guilds(conn)
+        for row in guild_rows:
+            try:
+                await self._poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
+            except Exception as exc:
+                print(f"[poller] guild={row['guild_id']} {exc}")
 
     @poll_orders.before_loop
     async def before_poll(self):
         await self.wait_until_ready()
 
-    async def on_message(self, message: discord.Message):
-        if message.author == self.user:
-            return
-
-        cmd = message.content.strip().lower()
-
-        if cmd == "!shop":
-            loop = asyncio.get_running_loop()
-            shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
-            embed = build_shop_embed(shop_data)
-            await message.channel.send(embed=embed)
-            return
-
-        if cmd != "!orders":
+    async def _poll_guild(self, guild_id: int, shop_id: int, channel_id: int) -> None:
+        etsy = self.etsy_clients.get(guild_id)
+        if not etsy:
             return
 
         loop = asyncio.get_running_loop()
-        shop_data = await loop.run_in_executor(None, lambda: self.etsy.get_shop(ETSY_SHOP_ID))
+        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
         response = await loop.run_in_executor(
-            None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=50)
+            None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
+        )
+        receipts = response.get("results", [])
+        channel = self.get_channel(channel_id)
+        shop_name = shop_data.get("shop_name", "My Shop")
+
+        async with await db.get_db() as conn:
+            await db.upsert_shop(conn, shop_data)
+            for receipt in receipts:
+                receipt.setdefault("shop_id", shop_id)
+                await db.upsert_receipt(conn, receipt)
+            await conn.commit()
+
+            unnotified = await db.get_unnotified_receipts(conn, shop_id)
+            for row in unnotified:
+                if channel:
+                    embed = build_order_embed(dict(row), shop_name=shop_name)
+                    await channel.send(embed=embed)
+                await db.mark_receipt_notified(conn, row["receipt_id"])
+                await conn.commit()
+
+    # ── Commands ──────────────────────────────────────────────────────────────
+
+    async def on_message(self, message: discord.Message):
+        if message.author == self.user or not message.guild:
+            return
+
+        cmd = message.content.strip().lower()
+        guild_id = message.guild.id
+
+        if cmd == "!setchannel":
+            await self._cmd_setchannel(message)
+        elif cmd == "!shop":
+            await self._cmd_shop(message, guild_id)
+        elif cmd == "!orders":
+            await self._cmd_orders(message, guild_id)
+        elif cmd == "!status":
+            await self._cmd_status(message, guild_id)
+
+    async def _cmd_setchannel(self, message: discord.Message) -> None:
+        if not message.author.guild_permissions.manage_channels:
+            await message.channel.send("You need the **Manage Channels** permission to use this.")
+            return
+
+        async with await db.get_db() as conn:
+            await db.update_guild_channel(conn, message.guild.id, message.channel.id)
+            await conn.commit()
+
+        await message.channel.send(
+            f"Order notifications will be posted in {message.channel.mention}."
+        )
+
+    async def _cmd_status(self, message: discord.Message, guild_id: int) -> None:
+        async with await db.get_db() as conn:
+            guild_row = await db.get_guild(conn, guild_id)
+
+        if not guild_row:
+            await message.channel.send("This server hasn't been set up yet. Add Shopkeep via the website.")
+            return
+
+        shop_id = guild_row["etsy_shop_id"]
+        channel_id = guild_row["order_channel_id"]
+        etsy_status = f"Connected (shop ID: {shop_id})" if shop_id else "Not connected"
+        channel_status = f"<#{channel_id}>" if channel_id else "Not set — use `!setchannel`"
+
+        if WEB_BASE_URL and not shop_id and guild_row["setup_token"]:
+            connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{guild_row['setup_token']}"
+        else:
+            connect_link = ""
+
+        await message.channel.send(
+            f"**Shopkeep Status**\n"
+            f"Etsy: {etsy_status}\n"
+            f"Notifications: {channel_status}"
+            f"{connect_link}"
+        )
+
+    async def _cmd_shop(self, message: discord.Message, guild_id: int) -> None:
+        etsy, shop_id = await self._get_client_and_shop(message, guild_id)
+        if not etsy:
+            return
+        loop = asyncio.get_running_loop()
+        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
+        await message.channel.send(embed=build_shop_embed(shop_data))
+
+    async def _cmd_orders(self, message: discord.Message, guild_id: int) -> None:
+        etsy, shop_id = await self._get_client_and_shop(message, guild_id)
+        if not etsy:
+            return
+        loop = asyncio.get_running_loop()
+        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
+        response = await loop.run_in_executor(
+            None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
         )
         receipts = response.get("results", [])
         shop_name = shop_data.get("shop_name", "My Shop")
@@ -167,42 +293,33 @@ class ShopkeepBot(discord.Client):
                 "grandtotal_divisor": gt.get("divisor", 100),
                 "grandtotal_currency": gt.get("currency_code", "USD"),
             }
-            embed = build_order_embed(normalized, shop_name=shop_name)
-            await message.channel.send(embed=embed)
+            await message.channel.send(embed=build_order_embed(normalized, shop_name=shop_name))
 
-    async def _do_poll(self):
-        loop = asyncio.get_running_loop()
-
-        shop_data = await loop.run_in_executor(
-            None, lambda: self.etsy.get_shop(ETSY_SHOP_ID)
-        )
-        response = await loop.run_in_executor(
-            None, lambda: self.etsy.get_shop_receipts(ETSY_SHOP_ID, limit=50)
-        )
-        receipts = response.get("results", [])
-        channel = self.get_channel(ORDER_CHANNEL_ID)
-        shop_name = shop_data.get("shop_name", "My Shop")
-
+    async def _get_client_and_shop(
+        self, message: discord.Message, guild_id: int
+    ) -> tuple[EtsyClient | None, int | None]:
+        """Return (EtsyClient, shop_id) for the guild, or send an error and return (None, None)."""
         async with await db.get_db() as conn:
-            await db.upsert_shop(conn, shop_data)
-            for receipt in receipts:
-                receipt.setdefault("shop_id", ETSY_SHOP_ID)
-                await db.upsert_receipt(conn, receipt)
-            await conn.commit()
+            guild_row = await db.get_guild(conn, guild_id)
 
-            unnotified = await db.get_unnotified_receipts(conn, ETSY_SHOP_ID)
-            for row in unnotified:
-                if channel:
-                    embed = build_order_embed(dict(row), shop_name=shop_name)
-                    await channel.send(embed=embed)
-                await db.mark_receipt_notified(conn, row["receipt_id"])
-                await conn.commit()
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            link = f" {WEB_BASE_URL}/connect/{guild_row['setup_token']}" if (
+                guild_row and guild_row["setup_token"] and WEB_BASE_URL
+            ) else ""
+            await message.channel.send(f"No Etsy shop connected.{link}")
+            return None, None
+
+        etsy = self.etsy_clients.get(guild_id)
+        if not etsy:
+            await message.channel.send("Etsy client not loaded. Try restarting the bot.")
+            return None, None
+
+        return etsy, guild_row["etsy_shop_id"]
 
 
 token = os.getenv("DISCORD_BOT_TOKEN")
 if not token:
-    print("ERROR: DISCORD_BOT_TOKEN not found in environment variables")
-    print("Make sure your .env file exists and contains: DISCORD_BOT_TOKEN=your_token")
+    print("ERROR: DISCORD_BOT_TOKEN not set")
     exit(1)
 
 client = ShopkeepBot()

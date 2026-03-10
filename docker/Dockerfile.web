@@ -1,0 +1,25 @@
+FROM python:3.10-slim
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+
+RUN useradd -m -u 1000 webuser && \
+    chown -R webuser:webuser /app
+
+USER webuser
+
+EXPOSE 8080
+
+CMD ["python", "-m", "src.web.app"]

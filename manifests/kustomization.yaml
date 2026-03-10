@@ -5,4 +5,5 @@ namespace: shopkeep
 
 resources:
   - deployment.yaml
+  - web-deployment.yaml
   - mock-etsy-deployment.yaml
