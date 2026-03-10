@@ -12,14 +12,28 @@
 - **DB**: Added `guilds` and `etsy_tokens` tables for per-guild shop connections
 - **Bot**: Per-guild `EtsyClient` registry; poll loop iterates all connected guilds
 - **`on_guild_join`**: Creates guild record + DMs server owner a unique setup link
-- **`on_ready`**: Detects guilds the bot is already in but hasn't registered yet (e.g. existing servers, or added while bot was offline) — creates their record and DMs the owner automatically
+- **`on_ready`**: Detects guilds the bot is already in but hasn't registered yet — creates their record and DMs the owner automatically
 - **New commands**: `!setchannel`, `!status`; `!shop` and `!orders` scoped per guild
 - **Web server** (`src/web/`): Flask app — landing page, Etsy PKCE OAuth connect flow, success/error pages
-- **Docker**: Added `Dockerfile.web`
+- **Docker**: Added `Dockerfile.web`; image built as multi-arch (`linux/amd64` + `linux/arm64`)
 - **k8s**: Added `manifests/web-deployment.yaml` (Deployment + ClusterIP Service)
+
+### 3. Infrastructure (complete)
 - **Domain**: `shopkeepbot.com` purchased
+- **DNS**: `@` and `www` A records pointing to home public IP
+- **Reverse proxy**: Nginx Proxy Manager on NAS (`10.0.0.28`) routes `shopkeepbot.com` → `shopkeep-web.shopkeep.svc.cluster.local:80`
+- **TLS**: Let's Encrypt cert issued via NPM
+- **k8s secrets**: All env vars loaded into `shopkeep-secrets`
 - **Etsy developer portal**: `https://shopkeepbot.com/callback/etsy` registered as redirect URI
-- **Discord**: `DISCORD_CLIENT_ID` obtained
+- **Discord**: `DISCORD_CLIENT_ID` set; bot is public
+- **Images**: Both `shopkeep` (bot) and `shopkeep-web` pushed to GHCR
+- **Deployed**: `shopkeep-bot` and `shopkeep-web` running on k3s cluster
+
+### 4. Cluster details
+- Control plane: `k3s-control-plane` at `10.0.0.3` (Ubuntu)
+- Worker node: `castillo-nas` at `10.0.0.28` (Debian, also runs NPM + Jellyfin)
+- Nginx ingress controller installed but not used — NPM routes directly to the k3s service DNS name
+- cert-manager installed with `letsencrypt-prod` ClusterIssuer (NPM handles certs instead)
 
 ---
 
@@ -38,11 +52,11 @@ When the bot starts fresh in production and finds a server it's already in, it D
 
 ---
 
-## User Flow (once live)
+## User Flow (live at shopkeepbot.com)
 
 1. Etsy seller visits `https://shopkeepbot.com`
 2. Clicks **"Add to Discord"** → bot joins their server
-3. Bot DMs the server owner a link: `https://shopkeepbot.com/connect/<token>`
+3. Bot DMs the server owner: `https://shopkeepbot.com/connect/<token>`
 4. Owner enters their Etsy shop name → clicks "Authorize with Etsy"
 5. Etsy OAuth completes → tokens + shop ID saved to DB
 6. Owner types `!setchannel` in Discord to choose the notifications channel
@@ -50,36 +64,10 @@ When the bot starts fresh in production and finds a server it's already in, it D
 
 ---
 
-## Still To Do (when home on the network)
+## Still To Do
 
-### 1. DNS
-Point `shopkeepbot.com` to your k3s cluster's external IP.
-- `A` record: `shopkeepbot.com` → `<cluster-ip>`
-- `A` record: `www.shopkeepbot.com` → `<cluster-ip>` (optional)
-
-### 2. Ingress manifest
-Ask Claude to write `manifests/ingress.yaml` — confirm your ingress controller first (`nginx` assumed). Needs cert-manager for automatic TLS via Let's Encrypt.
-
-### 3. Add new secrets to k8s
-Add these to the `shopkeep-secrets` Secret:
-
-| Key | Value |
-|---|---|
-| `DISCORD_CLIENT_ID` | Your Discord application ID |
-| `WEB_BASE_URL` | `https://shopkeepbot.com` |
-| `ETSY_WEB_REDIRECT_URI` | `https://shopkeepbot.com/callback/etsy` |
-| `ETSY_API_KEY` | Already set |
-| `ETSY_SHARED_SECRET` | Already set |
-
-```bash
-kubectl create secret generic shopkeep-secrets \
-  --namespace shopkeep \
-  --from-env-file=.env \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-### 4. Add web image to GitHub Actions CI
-A second Docker image (`shopkeep-web`) needs to be built and pushed alongside the bot image. Add to your existing workflow:
+### 1. Add web image to GitHub Actions CI
+Currently the web image must be built and pushed manually. Add it to the existing workflow so it builds automatically on push:
 
 ```yaml
 - name: Build and push web image
@@ -88,13 +76,15 @@ A second Docker image (`shopkeep-web`) needs to be built and pushed alongside th
     context: .
     file: docker/Dockerfile.web
     push: true
+    platforms: linux/amd64,linux/arm64
     tags: ghcr.io/madisonewebb/shopkeep-web:latest
 ```
 
-### 5. Deploy
-```bash
-kubectl apply -k manifests/
-```
+### 2. Test the full onboarding flow end to end
+- Add bot to a fresh Discord server
+- Confirm DM is received with setup link
+- Complete Etsy OAuth on the website
+- Run `!setchannel` and confirm orders post
 
 ---
 
@@ -119,4 +109,4 @@ kubectl apply -k manifests/
 |---|---|---|
 | `main` | Stable | Original single-tenant mock API bot |
 | `migrate-etsy` | Complete, merged | Real Etsy API v3 integration |
-| `multi-tenant` | In progress | Multi-tenant + website onboarding |
+| `multi-tenant` | Complete | Multi-tenant + website onboarding — **current production branch** |
