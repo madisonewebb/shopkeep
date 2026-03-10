@@ -10,11 +10,6 @@
     .card { max-width: 480px; margin: 80px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,.08); }
     h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
     .subtitle { color: #666; margin-bottom: 32px; line-height: 1.5; }
-    label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
-    input[type=text] { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; outline: none; }
-    input[type=text]:focus { border-color: #e8623a; }
-    .error { color: #c0392b; font-size: .9rem; margin-top: 8px; }
-    .hint { color: #888; font-size: .85rem; margin-top: 6px; }
     .btn { display: block; width: 100%; margin-top: 24px; padding: 12px; border: none; border-radius: 8px; background: #e8623a; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
     .btn:hover { opacity: .85; }
   </style>
@@ -24,14 +19,10 @@
     <h1>Connect your Etsy shop</h1>
     <p class="subtitle">
       {% if guild_name %}Setting up Shopkeep for <strong>{{ guild_name }}</strong>.{% endif %}
-      Enter your Etsy shop name, then authorize with Etsy.
+      Click below to authorize Shopkeep with your Etsy account.
     </p>
 
     <form method="post">
-      <label for="shop_name">Etsy shop name</label>
-      <input type="text" id="shop_name" name="shop_name" placeholder="e.g. CastilloCurios" autofocus>
-      {% if error %}<p class="error">{{ error }}</p>{% endif %}
-      <p class="hint">This is the name that appears in your Etsy shop URL: etsy.com/shop/<em>YourShopName</em></p>
       <button type="submit" class="btn">Authorize with Etsy →</button>
     </form>
   </div>

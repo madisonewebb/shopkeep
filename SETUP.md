@@ -66,21 +66,7 @@ When the bot starts fresh in production and finds a server it's already in, it D
 
 ## Still To Do
 
-### 1. Add web image to GitHub Actions CI
-Currently the web image must be built and pushed manually. Add it to the existing workflow so it builds automatically on push:
-
-```yaml
-- name: Build and push web image
-  uses: docker/build-push-action@v5
-  with:
-    context: .
-    file: docker/Dockerfile.web
-    push: true
-    platforms: linux/amd64,linux/arm64
-    tags: ghcr.io/madisonewebb/shopkeep-web:latest
-```
-
-### 2. Test the full onboarding flow end to end
+### 1. Test the full onboarding flow end to end
 - Add bot to a fresh Discord server
 - Confirm DM is received with setup link
 - Complete Etsy OAuth on the website

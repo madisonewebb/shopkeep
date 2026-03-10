@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS etsy_tokens (
 )
 """
 
+_CREATE_PKCE_STATE = """
+CREATE TABLE IF NOT EXISTS pkce_state (
+    state         TEXT    PRIMARY KEY,
+    code_verifier TEXT    NOT NULL,
+    setup_token   TEXT    NOT NULL,
+    guild_id      INTEGER NOT NULL,
+    expires_at    INTEGER NOT NULL
+)
+"""
+
 _CREATE_SHOPS = """
 CREATE TABLE IF NOT EXISTS shops (
     shop_id                   INTEGER PRIMARY KEY,
@@ -125,6 +135,7 @@ async def init_db() -> None:
         await db.execute("PRAGMA foreign_keys=ON")
         await db.execute(_CREATE_GUILDS)
         await db.execute(_CREATE_ETSY_TOKENS)
+        await db.execute(_CREATE_PKCE_STATE)
         await db.execute(_CREATE_SHOPS)
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
@@ -184,6 +195,15 @@ async def get_connected_guilds(db: aiosqlite.Connection) -> list:
     return await cursor.fetchall()
 
 
+async def refresh_setup_token(
+    db: aiosqlite.Connection, guild_id: int, setup_token: str, setup_token_exp: int
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET setup_token = ?, setup_token_exp = ? WHERE guild_id = ?",
+        (setup_token, setup_token_exp, guild_id),
+    )
+
+
 async def update_guild_etsy(
     db: aiosqlite.Connection, guild_id: int, etsy_shop_id: int
 ) -> None:
@@ -233,6 +253,38 @@ async def save_guild_tokens(
         (guild_id, access_token, refresh_token, expires_at),
     )
     await db.commit()
+
+
+# ── PKCE state helpers ────────────────────────────────────────────────────────
+
+async def save_pkce_state(
+    db: aiosqlite.Connection,
+    state: str,
+    code_verifier: str,
+    setup_token: str,
+    guild_id: int,
+    expires_at: int,
+) -> None:
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO pkce_state (state, code_verifier, setup_token, guild_id, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (state, code_verifier, setup_token, guild_id, expires_at),
+    )
+    await db.execute("DELETE FROM pkce_state WHERE expires_at <= ?", (int(time.time()),))
+
+
+async def get_pkce_state(db: aiosqlite.Connection, state: str) -> aiosqlite.Row | None:
+    cursor = await db.execute(
+        "SELECT * FROM pkce_state WHERE state = ? AND expires_at > ?",
+        (state, int(time.time())),
+    )
+    return await cursor.fetchone()
+
+
+async def delete_pkce_state(db: aiosqlite.Connection, state: str) -> None:
+    await db.execute("DELETE FROM pkce_state WHERE state = ?", (state,))
 
 
 # ── Shop / listing / receipt helpers ─────────────────────────────────────────

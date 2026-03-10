@@ -3,7 +3,7 @@ Shopkeep web server.
 
 Handles the user-facing setup flow:
   1. Landing page with "Add to Discord" invite link
-  2. /connect/<setup_token> — user enters shop name, starts Etsy OAuth
+  2. /connect/<setup_token> — user clicks "Authorize with Etsy" to start OAuth
   3. /callback/etsy       — Etsy redirects here after auth; stores tokens + shop_id
 
 Run with:
@@ -18,7 +18,7 @@ import time
 import urllib.parse
 
 import requests
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request
 from dotenv import load_dotenv
 
 from src.web import db as webdb
@@ -28,7 +28,6 @@ load_dotenv()
 app = Flask(__name__)
 
 ETSY_API_KEY = os.environ["ETSY_API_KEY"]
-ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
 ETSY_REDIRECT_URI = os.environ["ETSY_WEB_REDIRECT_URI"]
 DISCORD_CLIENT_ID = os.environ["DISCORD_CLIENT_ID"]
 WEB_BASE_URL = os.environ["WEB_BASE_URL"]
@@ -39,9 +38,9 @@ ETSY_API_BASE = "https://openapi.etsy.com/v3"
 
 ETSY_SCOPES = "transactions_r listings_r shops_r profile_r"
 
-# In-memory PKCE state: state_param -> {code_verifier, setup_token, shop_name}
-# Only lives for the duration of one OAuth flow (minutes).
-_pkce_state: dict[str, dict] = {}
+PKCE_STATE_TTL = 600  # 10 minutes
+
+webdb.init_pkce_table()
 
 
 # ── PKCE helpers ──────────────────────────────────────────────────────────────
@@ -51,6 +50,12 @@ def _make_pkce_pair() -> tuple[str, str]:
     digest = hashlib.sha256(verifier.encode()).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
     return verifier, challenge
+
+
+def _user_id_from_token(access_token: str) -> str | None:
+    """Etsy embeds the user ID as the numeric prefix of the access token."""
+    prefix = access_token.split(".")[0]
+    return prefix if prefix.isdigit() else None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -80,19 +85,11 @@ def connect(setup_token: str):
         return render_template("error.html", message="This server already has an Etsy shop connected.")
 
     if request.method == "POST":
-        shop_name = request.form.get("shop_name", "").strip()
-        if not shop_name:
-            return render_template("connect.html", setup_token=setup_token,
-                                   guild_name=guild["guild_name"], error="Please enter your shop name.")
-
         code_verifier, code_challenge = _make_pkce_pair()
         state = secrets.token_urlsafe(16)
-        _pkce_state[state] = {
-            "code_verifier": code_verifier,
-            "setup_token": setup_token,
-            "shop_name": shop_name,
-            "guild_id": guild["guild_id"],
-        }
+        expires_at = int(time.time()) + PKCE_STATE_TTL
+
+        webdb.save_pkce_state(state, code_verifier, setup_token, guild["guild_id"], expires_at)
 
         params = {
             "response_type": "code",
@@ -105,8 +102,7 @@ def connect(setup_token: str):
         }
         return redirect(ETSY_AUTH_URL + "?" + urllib.parse.urlencode(params))
 
-    return render_template("connect.html", setup_token=setup_token,
-                           guild_name=guild["guild_name"], error=None)
+    return render_template("connect.html", setup_token=setup_token, guild_name=guild["guild_name"])
 
 
 @app.route("/callback/etsy")
@@ -118,13 +114,11 @@ def etsy_callback():
     if error:
         return render_template("error.html", message=f"Etsy authorization denied: {error}")
 
-    if not code or state not in _pkce_state:
+    pkce = webdb.get_pkce_state(state) if state else None
+    if not code or not pkce:
         return render_template("error.html", message="Invalid OAuth callback. Please try again.")
 
-    pkce = _pkce_state.pop(state)
-    code_verifier = pkce["code_verifier"]
-    guild_id = pkce["guild_id"]
-    shop_name = pkce["shop_name"]
+    webdb.delete_pkce_state(state)
 
     # Exchange code for tokens
     resp = requests.post(
@@ -134,7 +128,7 @@ def etsy_callback():
             "client_id": ETSY_API_KEY,
             "redirect_uri": ETSY_REDIRECT_URI,
             "code": code,
-            "code_verifier": code_verifier,
+            "code_verifier": pkce["code_verifier"],
         },
     )
     if not resp.ok:
@@ -145,32 +139,32 @@ def etsy_callback():
     refresh_token = tokens["refresh_token"]
     expires_at = int(time.time()) + tokens.get("expires_in", 3600)
 
-    # Look up shop_id by name
+    # Look up the authenticated user's own shop — verifies ownership
+    user_id = _user_id_from_token(access_token)
+    if not user_id:
+        return render_template("error.html", message="Could not determine your Etsy user ID. Please try again.")
+
     shop_resp = requests.get(
-        f"{ETSY_API_BASE}/application/shops",
-        headers={"x-api-key": f"{ETSY_API_KEY}:{ETSY_SHARED_SECRET}"},
-        params={"shop_name": shop_name},
+        f"{ETSY_API_BASE}/application/users/{user_id}/shops",
+        headers={
+            "x-api-key": ETSY_API_KEY,
+            "Authorization": f"Bearer {access_token}",
+        },
     )
     if not shop_resp.ok:
-        return render_template("error.html", message="Could not find your Etsy shop. Please try again.")
+        return render_template("error.html", message="Could not retrieve your Etsy shop. Make sure your account has an active shop.")
 
     data = shop_resp.json()
     results = data.get("results") or ([data] if data.get("shop_id") else [])
-    shop = next(
-        (s for s in results if s.get("shop_name", "").lower() == shop_name.lower()),
-        None,
-    )
-    if not shop:
-        return render_template(
-            "error.html",
-            message=f"Could not find a shop named \"{shop_name}\". Check the spelling and try again.",
-        )
+    if not results:
+        return render_template("error.html", message="No Etsy shop found on your account.")
 
+    shop = results[0]
     shop_id = shop["shop_id"]
 
     # Persist to DB
-    webdb.save_guild_tokens(guild_id, access_token, refresh_token, expires_at)
-    webdb.update_guild_etsy(guild_id, shop_id)
+    webdb.save_guild_tokens(pkce["guild_id"], access_token, refresh_token, expires_at)
+    webdb.update_guild_etsy(pkce["guild_id"], shop_id)
 
     return render_template("success.html", shop_name=shop["shop_name"])
 

@@ -30,6 +30,7 @@ class ShopkeepBot(discord.Client):
         super().__init__(intents=intents)
         # guild_id -> EtsyClient, populated on startup and when new guilds connect
         self.etsy_clients: dict[int, EtsyClient] = {}
+        self._bootstrapped_guilds: set[int] = set()
         self._bootstrapped = False
 
     async def setup_hook(self):
@@ -95,6 +96,7 @@ class ShopkeepBot(discord.Client):
             for row in guild_rows:
                 try:
                     await self._bootstrap_guild(row["guild_id"], row["etsy_shop_id"])
+                    self._bootstrapped_guilds.add(row["guild_id"])
                 except Exception as exc:
                     print(f"[bootstrap] guild={row['guild_id']} {exc}")
             self.poll_orders.start()
@@ -185,13 +187,38 @@ class ShopkeepBot(discord.Client):
 
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
+        loop = asyncio.get_running_loop()
         async with await db.get_db() as conn:
             guild_rows = await db.get_connected_guilds(conn)
+            for row in guild_rows:
+                guild_id = row["guild_id"]
+                if guild_id not in self.etsy_clients:
+                    tokens = await db.get_guild_tokens(conn, guild_id)
+                    if tokens:
+                        self._register_client(
+                            loop, guild_id,
+                            tokens["access_token"], tokens["refresh_token"], tokens["expires_at"],
+                        )
+
         for row in guild_rows:
-            try:
-                await self._poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
-            except Exception as exc:
-                print(f"[poller] guild={row['guild_id']} {exc}")
+            guild_id = row["guild_id"]
+            if guild_id in self.etsy_clients and guild_id not in self._bootstrapped_guilds:
+                try:
+                    await self._bootstrap_guild(guild_id, row["etsy_shop_id"])
+                    self._bootstrapped_guilds.add(guild_id)
+                except Exception as exc:
+                    print(f"[poller] bootstrap guild={guild_id} {exc}")
+
+        await asyncio.gather(*(
+            self._safe_poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
+            for row in guild_rows
+        ))
+
+    async def _safe_poll_guild(self, guild_id: int, shop_id: int, channel_id: int) -> None:
+        try:
+            await self._poll_guild(guild_id, shop_id, channel_id)
+        except Exception as exc:
+            print(f"[poller] guild={guild_id} {exc}")
 
     @poll_orders.before_loop
     async def before_poll(self):
@@ -270,10 +297,17 @@ class ShopkeepBot(discord.Client):
         etsy_status = f"Connected (shop ID: {shop_id})" if shop_id else "Not connected"
         channel_status = f"<#{channel_id}>" if channel_id else "Not set — use `!setchannel`"
 
-        if WEB_BASE_URL and not shop_id and guild_row["setup_token"]:
-            connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{guild_row['setup_token']}"
-        else:
-            connect_link = ""
+        connect_link = ""
+        if WEB_BASE_URL and not shop_id:
+            token = guild_row["setup_token"]
+            exp = guild_row["setup_token_exp"] or 0
+            if not token or exp < int(time.time()):
+                token = secrets.token_urlsafe(16)
+                exp = int(time.time()) + SETUP_TOKEN_TTL
+                async with await db.get_db() as conn:
+                    await db.refresh_setup_token(conn, guild_row["guild_id"], token, exp)
+                    await conn.commit()
+            connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{token}"
 
         await message.channel.send(
             f"**Shopkeep Status**\n"
