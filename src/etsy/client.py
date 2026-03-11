@@ -57,7 +57,7 @@ class EtsyClient:
 
     def _headers(self) -> Dict[str, str]:
         return {
-            "x-api-key": self.api_key,
+            "x-api-key": f"{self.api_key}:{self.shared_secret}",
             "Authorization": f"Bearer {self.access_token}",
         }
 
