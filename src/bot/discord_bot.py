@@ -91,6 +91,9 @@ class ShopkeepBot(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user} | {len(self.etsy_clients)} shop(s) connected")
+        # Sync commands to each guild immediately (guild sync is instant vs. up to 1h for global)
+        for guild in self.guilds:
+            await self.tree.sync(guild=guild)
         if not self._bootstrapped:
             self._bootstrapped = True
             await self._register_existing_guilds()
