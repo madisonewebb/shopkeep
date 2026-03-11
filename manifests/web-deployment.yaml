@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shopkeep-web
+  namespace: shopkeep
+  labels:
+    app: shopkeep-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopkeep-web
+  template:
+    metadata:
+      labels:
+        app: shopkeep-web
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: web
+        image: ghcr.io/madisonewebb/shopkeep-web:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ETSY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: ETSY_API_KEY
+        - name: ETSY_SHARED_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: ETSY_SHARED_SECRET
+        - name: ETSY_WEB_REDIRECT_URI
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: ETSY_WEB_REDIRECT_URI
+        - name: DISCORD_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: DISCORD_CLIENT_ID
+        - name: WEB_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: WEB_BASE_URL
+        - name: DB_PATH
+          value: "/app/data/shopkeep.db"
+        - name: PORT
+          value: "8080"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: shopkeep-data
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shopkeep-web
+  namespace: shopkeep
+spec:
+  selector:
+    app: shopkeep-web
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopkeep — Etsy order notifications for Discord</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9f6f2; color: #333; }
+    .hero { max-width: 640px; margin: 0 auto; padding: 80px 24px; text-align: center; }
+    .logo { font-size: 2.5rem; margin-bottom: 16px; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+    .tagline { font-size: 1.1rem; color: #666; margin-bottom: 40px; line-height: 1.6; }
+    .btn { display: inline-block; padding: 14px 32px; border-radius: 8px; font-size: 1rem; font-weight: 600; text-decoration: none; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-discord { background: #5865F2; color: #fff; }
+    .steps { max-width: 640px; margin: 0 auto 80px; padding: 0 24px; }
+    .steps h2 { font-size: 1.1rem; font-weight: 600; text-align: center; margin-bottom: 24px; color: #555; }
+    .step { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+    .step-num { width: 32px; height: 32px; border-radius: 50%; background: #e8623a; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step p { padding-top: 4px; line-height: 1.5; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="logo">🛍️</div>
+    <h1>Shopkeep</h1>
+    <p class="tagline">Get instant Discord notifications every time a new order arrives in your Etsy shop.</p>
+    <a href="{{ invite_url }}" class="btn btn-discord">Add to Discord</a>
+  </div>
+
+  <div class="steps">
+    <h2>How it works</h2>
+    <div class="step">
+      <div class="step-num">1</div>
+      <p>Click <strong>Add to Discord</strong> and choose your server.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <p>Shopkeep will DM you a link to connect your Etsy shop.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <p>Use <code>!setchannel</code> in Discord to pick where notifications go.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <p>That's it — new orders appear automatically, no refreshing required.</p>
+    </div>
+  </div>
+</body>
+</html>

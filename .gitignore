@@ -209,3 +209,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 manifests/secret.yaml
+
+# Etsy OAuth token cache (contains secrets)
+scripts/.etsy_tokens.json

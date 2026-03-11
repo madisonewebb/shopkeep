@@ -1,6 +1,6 @@
 """
 SQLite persistence layer for Shopkeep bot.
-Stores shops, listings, and receipts fetched from the Etsy API.
+Stores shops, listings, receipts, and per-guild Etsy connections.
 """
 
 import json
@@ -10,6 +10,38 @@ import aiosqlite
 
 # Set by discord_bot.py before init_db() is called
 DB_PATH: str = "./shopkeep.db"
+
+_CREATE_GUILDS = """
+CREATE TABLE IF NOT EXISTS guilds (
+    guild_id         INTEGER PRIMARY KEY,
+    guild_name       TEXT,
+    etsy_shop_id     INTEGER,
+    order_channel_id INTEGER,
+    setup_token      TEXT    UNIQUE,
+    setup_token_exp  INTEGER,
+    connected_at     INTEGER,
+    created_at       INTEGER NOT NULL
+)
+"""
+
+_CREATE_ETSY_TOKENS = """
+CREATE TABLE IF NOT EXISTS etsy_tokens (
+    guild_id      INTEGER PRIMARY KEY REFERENCES guilds(guild_id),
+    access_token  TEXT    NOT NULL,
+    refresh_token TEXT    NOT NULL,
+    expires_at    INTEGER NOT NULL
+)
+"""
+
+_CREATE_PKCE_STATE = """
+CREATE TABLE IF NOT EXISTS pkce_state (
+    state         TEXT    PRIMARY KEY,
+    code_verifier TEXT    NOT NULL,
+    setup_token   TEXT    NOT NULL,
+    guild_id      INTEGER NOT NULL,
+    expires_at    INTEGER NOT NULL
+)
+"""
 
 _CREATE_SHOPS = """
 CREATE TABLE IF NOT EXISTS shops (
@@ -101,6 +133,9 @@ async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(_CREATE_GUILDS)
+        await db.execute(_CREATE_ETSY_TOKENS)
+        await db.execute(_CREATE_PKCE_STATE)
         await db.execute(_CREATE_SHOPS)
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
@@ -116,8 +151,145 @@ async def get_db() -> aiosqlite.Connection:
     return conn
 
 
+# ── Guild helpers ─────────────────────────────────────────────────────────────
+
+async def create_guild(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    guild_name: str,
+    setup_token: str,
+    setup_token_exp: int,
+) -> None:
+    """Insert a new guild row (ignores if already exists)."""
+    await db.execute(
+        """
+        INSERT OR IGNORE INTO guilds (guild_id, guild_name, setup_token, setup_token_exp, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (guild_id, guild_name, setup_token, setup_token_exp, int(time.time())),
+    )
+
+
+async def get_guild(db: aiosqlite.Connection, guild_id: int) -> aiosqlite.Row | None:
+    cursor = await db.execute("SELECT * FROM guilds WHERE guild_id = ?", (guild_id,))
+    return await cursor.fetchone()
+
+
+async def get_guild_by_setup_token(
+    db: aiosqlite.Connection, setup_token: str
+) -> aiosqlite.Row | None:
+    cursor = await db.execute(
+        "SELECT * FROM guilds WHERE setup_token = ?", (setup_token,)
+    )
+    return await cursor.fetchone()
+
+
+async def get_connected_guilds(db: aiosqlite.Connection) -> list:
+    """Return all guilds that have a connected Etsy shop and an order channel set."""
+    cursor = await db.execute(
+        """
+        SELECT * FROM guilds
+        WHERE etsy_shop_id IS NOT NULL AND order_channel_id IS NOT NULL
+        """
+    )
+    return await cursor.fetchall()
+
+
+async def refresh_setup_token(
+    db: aiosqlite.Connection, guild_id: int, setup_token: str, setup_token_exp: int
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET setup_token = ?, setup_token_exp = ? WHERE guild_id = ?",
+        (setup_token, setup_token_exp, guild_id),
+    )
+
+
+async def update_guild_etsy(
+    db: aiosqlite.Connection, guild_id: int, etsy_shop_id: int
+) -> None:
+    """Mark a guild's Etsy shop as connected."""
+    await db.execute(
+        """
+        UPDATE guilds
+        SET etsy_shop_id = ?, connected_at = ?, setup_token = NULL, setup_token_exp = NULL
+        WHERE guild_id = ?
+        """,
+        (etsy_shop_id, int(time.time()), guild_id),
+    )
+
+
+async def update_guild_channel(
+    db: aiosqlite.Connection, guild_id: int, channel_id: int
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET order_channel_id = ? WHERE guild_id = ?",
+        (channel_id, guild_id),
+    )
+
+
+# ── Etsy token helpers ────────────────────────────────────────────────────────
+
+async def get_guild_tokens(
+    db: aiosqlite.Connection, guild_id: int
+) -> aiosqlite.Row | None:
+    cursor = await db.execute(
+        "SELECT * FROM etsy_tokens WHERE guild_id = ?", (guild_id,)
+    )
+    return await cursor.fetchone()
+
+
+async def save_guild_tokens(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    access_token: str,
+    refresh_token: str,
+    expires_at: int,
+) -> None:
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO etsy_tokens (guild_id, access_token, refresh_token, expires_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (guild_id, access_token, refresh_token, expires_at),
+    )
+    await db.commit()
+
+
+# ── PKCE state helpers ────────────────────────────────────────────────────────
+
+async def save_pkce_state(
+    db: aiosqlite.Connection,
+    state: str,
+    code_verifier: str,
+    setup_token: str,
+    guild_id: int,
+    expires_at: int,
+) -> None:
+    await db.execute(
+        """
+        INSERT OR REPLACE INTO pkce_state (state, code_verifier, setup_token, guild_id, expires_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (state, code_verifier, setup_token, guild_id, expires_at),
+    )
+    await db.execute("DELETE FROM pkce_state WHERE expires_at <= ?", (int(time.time()),))
+
+
+async def get_pkce_state(db: aiosqlite.Connection, state: str) -> aiosqlite.Row | None:
+    cursor = await db.execute(
+        "SELECT * FROM pkce_state WHERE state = ? AND expires_at > ?",
+        (state, int(time.time())),
+    )
+    return await cursor.fetchone()
+
+
+async def delete_pkce_state(db: aiosqlite.Connection, state: str) -> None:
+    await db.execute("DELETE FROM pkce_state WHERE state = ?", (state,))
+
+
+# ── Shop / listing / receipt helpers ─────────────────────────────────────────
+
 async def upsert_shop(db: aiosqlite.Connection, shop: dict) -> None:
-    """Insert or replace a shop row, mapping camelCase API fields to snake_case columns."""
     await db.execute(
         """
         INSERT OR REPLACE INTO shops (
@@ -150,7 +322,6 @@ async def upsert_shop(db: aiosqlite.Connection, shop: dict) -> None:
 
 
 async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
-    """Insert or replace a listing row, mapping camelCase API fields to snake_case columns."""
     price = listing.get("price", {})
     await db.execute(
         """
@@ -192,18 +363,16 @@ async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
 
 
 async def upsert_listings(db: aiosqlite.Connection, listings: list) -> None:
-    """Upsert a list of listing dicts."""
     for listing in listings:
         await upsert_listing(db, listing)
 
 
-async def upsert_receipt(db: aiosqlite.Connection, receipt: dict, already_seen: bool = False) -> bool:
+async def upsert_receipt(
+    db: aiosqlite.Connection, receipt: dict, already_seen: bool = False
+) -> bool:
     """
-    Insert a new receipt row, ignoring conflicts to preserve notified_at on existing rows.
+    Insert a new receipt row, ignoring conflicts to preserve notified_at.
     Returns True if a new row was inserted.
-
-    Pass already_seen=True during bootstrap to stamp notified_at immediately so the
-    poll loop never treats pre-existing orders as new.
     """
     grandtotal = receipt.get("grandtotal", {})
     subtotal = receipt.get("subtotal", {})
@@ -259,7 +428,6 @@ async def upsert_receipt(db: aiosqlite.Connection, receipt: dict, already_seen: 
 
 
 async def get_unnotified_receipts(db: aiosqlite.Connection, shop_id: int) -> list:
-    """Return all receipts for a shop that have not yet been notified."""
     cursor = await db.execute(
         """
         SELECT * FROM receipts
@@ -272,7 +440,6 @@ async def get_unnotified_receipts(db: aiosqlite.Connection, shop_id: int) -> lis
 
 
 async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> None:
-    """Stamp notified_at with the current unix time."""
     await db.execute(
         "UPDATE receipts SET notified_at = ? WHERE receipt_id = ?",
         (int(time.time()), receipt_id),
