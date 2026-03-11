@@ -2,14 +2,15 @@
 
 [![Deploy](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml/badge.svg)](https://github.com/madisonewebb/shopkeep/actions/workflows/deploy.yml)
 
-A Discord bot that posts Etsy order notifications to your server.
+A multi-tenant Discord bot that posts Etsy order notifications to your server. Each Discord server connects to its own Etsy shop via OAuth.
 
 ---
 
 ## What it does
 
-- Polls your Etsy shop every 60 seconds for new orders
-- Posts order notifications to a Discord channel as embeds
+- Guild owners authenticate their Etsy shop through a web onboarding flow
+- Polls each connected shop every 60 seconds for new orders
+- Posts order notifications to a configured Discord channel as embeds
 - Persists shop, listing, and order data in SQLite
 
 ## Bot commands
@@ -18,8 +19,21 @@ A Discord bot that posts Etsy order notifications to your server.
 |---|---|
 | `!shop` | Shows your shop name, location, total sales, and rating |
 | `!orders` | Lists open orders with buyer, total, and shipping status |
+| `!status` | Shows connection status and which Etsy shop is linked |
+| `!setchannel` | Sets the current channel as the order notification channel |
 
 See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
+
+---
+
+## How it works
+
+1. Add the bot to your Discord server
+2. The bot DMs the server owner a link to the setup page
+3. The owner logs in with Etsy and authorizes the bot
+4. The bot starts polling for new orders and posts notifications
+
+Each Discord server is independent — different servers can monitor different Etsy shops.
 
 ---
 
@@ -28,7 +42,8 @@ See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
 ### Prerequisites
 
 - Docker & [Tilt](https://tilt.dev/)
-- Discord bot token ([create one here](https://discord.com/developers/applications))
+- A Discord bot token ([create one here](https://discord.com/developers/applications))
+- An Etsy API key ([apply here](https://www.etsy.com/developers/register))
 
 ### Run locally
 
@@ -43,7 +58,7 @@ See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
 
    ```bash
    cp .env.example .env
-   # Fill in DISCORD_BOT_TOKEN and ORDER_CHANNEL_ID
+   # Fill in the required values (see Environment variables below)
    ```
 
 3. Start everything:
@@ -52,7 +67,7 @@ See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
    tilt up
    ```
 
-   This builds the Docker images, starts the mock Etsy API and the bot, and watches for file changes with auto-reload.
+   This builds the Docker images, starts the mock Etsy API, the bot, and the web server, and watches for file changes with auto-reload.
 
 4. To stop:
 
@@ -65,9 +80,11 @@ See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DISCORD_BOT_TOKEN` | Yes | — | Discord bot token |
-| `ORDER_CHANNEL_ID` | Yes | — | Discord channel ID for notifications |
-| `ETSY_API_URL` | No | `http://localhost:5000` | Etsy API base URL |
-| `ETSY_SHOP_ID` | No | `12345678` | Shop ID to monitor |
+| `DISCORD_CLIENT_ID` | Yes | — | Discord application client ID |
+| `ETSY_API_KEY` | Yes | — | Etsy keystring from developer.etsy.com |
+| `ETSY_SHARED_SECRET` | Yes | — | Etsy shared secret |
+| `WEB_BASE_URL` | Yes | — | Public URL of the web server (no trailing slash) |
+| `ETSY_WEB_REDIRECT_URI` | Yes | — | Etsy OAuth callback URL (e.g. `{WEB_BASE_URL}/callback/etsy`) |
 | `POLL_INTERVAL_SECS` | No | `60` | Polling frequency in seconds |
 | `DB_PATH` | No | `./shopkeep.db` | SQLite database path |
 
@@ -93,11 +110,27 @@ Pushes to `main` trigger a GitHub Actions deploy to a k3s cluster.
 
 - Docker images are published to GHCR: `ghcr.io/madisonewebb/shopkeep`
 - Manifests are applied via Kustomize from `manifests/`
-- Before the first deploy, apply the SQLite PVC manually:
 
-  ```bash
-  kubectl apply -f manifests/pvc.yaml
-  ```
+### First-time setup
+
+1. Apply the SQLite PVC:
+
+   ```bash
+   kubectl apply -f manifests/pvc.yaml
+   ```
+
+2. Create the `shopkeep-secrets` Kubernetes secret with all required env vars:
+
+   ```bash
+   kubectl create secret generic shopkeep-secrets \
+     --namespace shopkeep \
+     --from-literal=DISCORD_BOT_TOKEN=... \
+     --from-literal=DISCORD_CLIENT_ID=... \
+     --from-literal=ETSY_API_KEY=... \
+     --from-literal=ETSY_SHARED_SECRET=... \
+     --from-literal=WEB_BASE_URL=... \
+     --from-literal=ETSY_WEB_REDIRECT_URI=...
+   ```
 
 ---
 
