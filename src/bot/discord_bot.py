@@ -25,9 +25,9 @@ SETUP_TOKEN_TTL = 86400  # 24 hours
 class ShopkeepBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
-        intents.message_content = True
         intents.guilds = True
         super().__init__(intents=intents)
+        self.tree = discord.app_commands.CommandTree(self)
         # guild_id -> EtsyClient, populated on startup and when new guilds connect
         self.etsy_clients: dict[int, EtsyClient] = {}
         self._bootstrapped_guilds: set[int] = set()
@@ -50,6 +50,9 @@ class ShopkeepBot(discord.Client):
                         tokens["refresh_token"],
                         tokens["expires_at"],
                     )
+
+        self._setup_slash_commands()
+        await self.tree.sync()
 
     def _register_client(
         self,
@@ -122,7 +125,7 @@ class ShopkeepBot(discord.Client):
                         f"Hi! Shopkeep needs to be connected to your Etsy shop for **{guild.name}**.\n\n"
                         f"Complete setup here:\n"
                         f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
-                        f"After connecting, use `!setchannel` to choose where order notifications go."
+                        f"After connecting, use `/setchannel` to choose where order notifications go."
                     )
                 except discord.Forbidden:
                     pass
@@ -144,7 +147,7 @@ class ShopkeepBot(discord.Client):
                     f"Connect your Etsy shop to start receiving order notifications:\n"
                     f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
                     f"After connecting, use `!setchannel` in any channel to choose "
-                    f"where order notifications are posted."
+                    f"where order notifications are posted. Use `/setchannel` in any channel to set it."
                 )
             except discord.Forbidden:
                 pass  # Owner has DMs disabled
@@ -255,47 +258,68 @@ class ShopkeepBot(discord.Client):
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
-    async def on_message(self, message: discord.Message):
-        if message.author == self.user or not message.guild:
-            return
+    def _setup_slash_commands(self) -> None:
+        tree = self.tree
 
-        cmd = message.content.strip().lower()
-        guild_id = message.guild.id
+        @tree.command(name="help", description="List all Shopkeep commands")
+        async def help_cmd(interaction: discord.Interaction):
+            await self._cmd_help(interaction)
 
-        if cmd == "!setchannel":
-            await self._cmd_setchannel(message)
-        elif cmd == "!shop":
-            await self._cmd_shop(message, guild_id)
-        elif cmd == "!orders":
-            await self._cmd_orders(message, guild_id)
-        elif cmd == "!status":
-            await self._cmd_status(message, guild_id)
+        @tree.command(name="status", description="Show Etsy connection and notification channel")
+        async def status(interaction: discord.Interaction):
+            await self._cmd_status(interaction)
 
-    async def _cmd_setchannel(self, message: discord.Message) -> None:
-        if not message.author.guild_permissions.manage_channels:
-            await message.channel.send("You need the **Manage Channels** permission to use this.")
-            return
+        @tree.command(name="setchannel", description="Set this channel for order notifications")
+        async def setchannel(interaction: discord.Interaction):
+            await self._cmd_setchannel(interaction)
 
-        async with db.get_db() as conn:
-            await db.update_guild_channel(conn, message.guild.id, message.channel.id)
-            await conn.commit()
+        @tree.command(name="shop", description="Show your Etsy shop info")
+        async def shop(interaction: discord.Interaction):
+            await self._cmd_shop(interaction)
 
-        await message.channel.send(
-            f"Order notifications will be posted in {message.channel.mention}."
+        @tree.command(name="orders", description="Show open orders from the last 30 days")
+        async def orders(interaction: discord.Interaction):
+            await self._cmd_orders(interaction)
+
+    async def _cmd_help(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(
+            "**Shopkeep Commands**\n"
+            "`/help` — List all commands\n"
+            "`/status` — Show Etsy connection and notification channel\n"
+            "`/setchannel` — Set this channel for order notifications\n"
+            "`/shop` — Show your Etsy shop info\n"
+            "`/orders` — Show open orders from the last 30 days"
         )
 
-    async def _cmd_status(self, message: discord.Message, guild_id: int) -> None:
+    async def _cmd_setchannel(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_channels:
+            await interaction.response.send_message(
+                "You need the **Manage Channels** permission to use this.", ephemeral=True
+            )
+            return
+
         async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, guild_id)
+            await db.update_guild_channel(conn, interaction.guild_id, interaction.channel_id)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            f"Order notifications will be posted in <#{interaction.channel_id}>."
+        )
+
+    async def _cmd_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
 
         if not guild_row:
-            await message.channel.send("This server hasn't been set up yet. Add Shopkeep via the website.")
+            await interaction.response.send_message(
+                "This server hasn't been set up yet. Add Shopkeep via the website."
+            )
             return
 
         shop_id = guild_row["etsy_shop_id"]
         channel_id = guild_row["order_channel_id"]
         etsy_status = f"Connected (shop ID: {shop_id})" if shop_id else "Not connected"
-        channel_status = f"<#{channel_id}>" if channel_id else "Not set — use `!setchannel`"
+        channel_status = f"<#{channel_id}>" if channel_id else "Not set — use `/setchannel`"
 
         connect_link = ""
         if WEB_BASE_URL and not shop_id:
@@ -309,27 +333,29 @@ class ShopkeepBot(discord.Client):
                     await conn.commit()
             connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{token}"
 
-        await message.channel.send(
+        await interaction.response.send_message(
             f"**Shopkeep Status**\n"
             f"Etsy: {etsy_status}\n"
             f"Notifications: {channel_status}"
             f"{connect_link}"
         )
 
-    async def _cmd_shop(self, message: discord.Message, guild_id: int) -> None:
-        etsy, shop_id = await self._get_client_and_shop(message, guild_id)
+    async def _cmd_shop(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        etsy, shop_id = await self._get_etsy_client(interaction)
         if not etsy:
             return
         loop = asyncio.get_running_loop()
         try:
             shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
         except Exception as exc:
-            await message.channel.send(f"Failed to fetch shop info: {exc}")
+            await interaction.followup.send(f"Failed to fetch shop info: {exc}")
             return
-        await message.channel.send(embed=build_shop_embed(shop_data))
+        await interaction.followup.send(embed=build_shop_embed(shop_data))
 
-    async def _cmd_orders(self, message: discord.Message, guild_id: int) -> None:
-        etsy, shop_id = await self._get_client_and_shop(message, guild_id)
+    async def _cmd_orders(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        etsy, shop_id = await self._get_etsy_client(interaction)
         if not etsy:
             return
         loop = asyncio.get_running_loop()
@@ -340,7 +366,7 @@ class ShopkeepBot(discord.Client):
                 None, lambda: etsy.get_shop_receipts(shop_id, limit=50, min_created=min_created)
             )
         except Exception as exc:
-            await message.channel.send(f"Failed to fetch orders: {exc}")
+            await interaction.followup.send(f"Failed to fetch orders: {exc}")
             return
         receipts = [
             r for r in response.get("results", [])
@@ -349,7 +375,7 @@ class ShopkeepBot(discord.Client):
         shop_name = shop_data.get("shop_name", "My Shop")
 
         if not receipts:
-            await message.channel.send("No open orders in the last 30 days.")
+            await interaction.followup.send("No open orders in the last 30 days.")
             return
 
         for receipt in receipts:
@@ -366,25 +392,25 @@ class ShopkeepBot(discord.Client):
                 "grandtotal_divisor": gt.get("divisor", 100),
                 "grandtotal_currency": gt.get("currency_code", "USD"),
             }
-            await message.channel.send(embed=build_order_embed(normalized, shop_name=shop_name))
+            await interaction.followup.send(embed=build_order_embed(normalized, shop_name=shop_name))
 
-    async def _get_client_and_shop(
-        self, message: discord.Message, guild_id: int
+    async def _get_etsy_client(
+        self, interaction: discord.Interaction
     ) -> tuple[EtsyClient | None, int | None]:
-        """Return (EtsyClient, shop_id) for the guild, or send an error and return (None, None)."""
+        """Return (EtsyClient, shop_id) for the guild, or send an error via followup and return (None, None)."""
         async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, guild_id)
+            guild_row = await db.get_guild(conn, interaction.guild_id)
 
         if not guild_row or not guild_row["etsy_shop_id"]:
             link = f" {WEB_BASE_URL}/connect/{guild_row['setup_token']}" if (
                 guild_row and guild_row["setup_token"] and WEB_BASE_URL
             ) else ""
-            await message.channel.send(f"No Etsy shop connected.{link}")
+            await interaction.followup.send(f"No Etsy shop connected.{link}")
             return None, None
 
-        etsy = self.etsy_clients.get(guild_id)
+        etsy = self.etsy_clients.get(interaction.guild_id)
         if not etsy:
-            await message.channel.send("Etsy client not loaded. Try restarting the bot.")
+            await interaction.followup.send("Etsy client not loaded. Try restarting the bot.")
             return None, None
 
         return etsy, guild_row["etsy_shop_id"]
