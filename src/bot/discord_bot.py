@@ -22,6 +22,63 @@ WEB_BASE_URL = os.getenv("WEB_BASE_URL", "")
 SETUP_TOKEN_TTL = 86400  # 24 hours
 
 
+_ORDERS_PAGE_SIZE = 5
+
+
+class OrdersView(discord.ui.View):
+    def __init__(self, pages: list[discord.Embed]):
+        super().__init__(timeout=120)
+        self.pages = pages
+        self.current = 0
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_button.disabled = self.current == 0
+        self.next_button.disabled = self.current == len(self.pages) - 1
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current -= 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current += 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+
+def _build_orders_pages(receipts: list[dict], shop_name: str) -> list[discord.Embed]:
+    total = len(receipts)
+    total_pages = (total + _ORDERS_PAGE_SIZE - 1) // _ORDERS_PAGE_SIZE
+    pages = []
+    for page_num, i in enumerate(range(0, total, _ORDERS_PAGE_SIZE), start=1):
+        chunk = receipts[i:i + _ORDERS_PAGE_SIZE]
+        embed = discord.Embed(
+            title=f"Open Orders ({total})",
+            color=discord.Color.orange(),
+        )
+        for r in chunk:
+            gt = r.get("grandtotal") or {}
+            amount = gt.get("amount", 0)
+            divisor = gt.get("divisor") or 100
+            currency = gt.get("currency_code", "USD")
+            total_str = f"${amount / divisor:.2f} {currency}"
+            status = (r.get("status") or "Unknown").capitalize()
+            shipped = "Shipped" if r.get("is_shipped") else "Not shipped"
+            buyer = r.get("name") or "Unknown"
+            embed.add_field(
+                name=f"Order #{r.get('receipt_id')} — {buyer}",
+                value=f"{total_str} · {status} · {shipped}",
+                inline=False,
+            )
+        footer = shop_name if total_pages == 1 else f"Page {page_num} of {total_pages} · {shop_name}"
+        embed.set_footer(text=footer)
+        pages.append(embed)
+    return pages
+
+
 class ShopkeepBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -381,21 +438,11 @@ class ShopkeepBot(discord.Client):
             await interaction.followup.send("No open orders in the last 30 days.")
             return
 
-        for receipt in receipts:
-            gt = receipt.get("grandtotal", {})
-            normalized = {
-                "receipt_id": receipt.get("receipt_id"),
-                "name": receipt.get("name"),
-                "status": receipt.get("status"),
-                "is_paid": receipt.get("is_paid"),
-                "is_shipped": receipt.get("is_shipped"),
-                "gift_message": receipt.get("gift_message"),
-                "create_timestamp": receipt.get("create_timestamp"),
-                "grandtotal_amount": gt.get("amount", 0),
-                "grandtotal_divisor": gt.get("divisor", 100),
-                "grandtotal_currency": gt.get("currency_code", "USD"),
-            }
-            await interaction.followup.send(embed=build_order_embed(normalized, shop_name=shop_name))
+        pages = _build_orders_pages(receipts, shop_name)
+        if len(pages) == 1:
+            await interaction.followup.send(embed=pages[0])
+        else:
+            await interaction.followup.send(embed=pages[0], view=OrdersView(pages))
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction
