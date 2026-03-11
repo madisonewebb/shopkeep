@@ -5,6 +5,7 @@ Stores shops, listings, receipts, and per-guild Etsy connections.
 
 import json
 import time
+from contextlib import asynccontextmanager
 
 import aiosqlite
 
@@ -142,13 +143,14 @@ async def init_db() -> None:
         await db.commit()
 
 
-async def get_db() -> aiosqlite.Connection:
+@asynccontextmanager
+async def get_db():
     """Open a WAL-mode connection with foreign keys enabled and Row factory set."""
-    conn = await aiosqlite.connect(DB_PATH)
-    await conn.execute("PRAGMA journal_mode=WAL")
-    await conn.execute("PRAGMA foreign_keys=ON")
-    conn.row_factory = aiosqlite.Row
-    return conn
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA foreign_keys=ON")
+        conn.row_factory = aiosqlite.Row
+        yield conn
 
 
 # ── Guild helpers ─────────────────────────────────────────────────────────────

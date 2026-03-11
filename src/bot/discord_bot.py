@@ -38,7 +38,7 @@ class ShopkeepBot(discord.Client):
         await db.init_db()
 
         loop = asyncio.get_running_loop()
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             guilds = await db.get_connected_guilds(conn)
             for guild_row in guilds:
                 tokens = await db.get_guild_tokens(conn, guild_row["guild_id"])
@@ -81,7 +81,7 @@ class ShopkeepBot(discord.Client):
     async def _save_guild_tokens(
         self, guild_id: int, access_token: str, refresh_token: str, expires_at: int
     ) -> None:
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             await db.save_guild_tokens(conn, guild_id, access_token, refresh_token, expires_at)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ class ShopkeepBot(discord.Client):
         if not self._bootstrapped:
             self._bootstrapped = True
             await self._register_existing_guilds()
-            async with await db.get_db() as conn:
+            async with db.get_db() as conn:
                 guild_rows = await db.get_connected_guilds(conn)
             for row in guild_rows:
                 try:
@@ -106,7 +106,7 @@ class ShopkeepBot(discord.Client):
         This handles guilds that were joined before multi-tenant support, or while the bot was offline.
         """
         for guild in self.guilds:
-            async with await db.get_db() as conn:
+            async with db.get_db() as conn:
                 existing = await db.get_guild(conn, guild.id)
                 if existing:
                     continue
@@ -131,7 +131,7 @@ class ShopkeepBot(discord.Client):
         setup_token = secrets.token_urlsafe(16)
         setup_token_exp = int(time.time()) + SETUP_TOKEN_TTL
 
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             await db.create_guild(conn, guild.id, guild.name, setup_token, setup_token_exp)
             await conn.commit()
 
@@ -170,7 +170,7 @@ class ShopkeepBot(discord.Client):
         listings = listings_resp.get("results", [])
         receipts = receipts_resp.get("results", [])
 
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
             await db.upsert_listings(conn, listings)
             for receipt in receipts:
@@ -188,7 +188,7 @@ class ShopkeepBot(discord.Client):
     @tasks.loop(seconds=POLL_INTERVAL_SECS)
     async def poll_orders(self):
         loop = asyncio.get_running_loop()
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             guild_rows = await db.get_connected_guilds(conn)
             for row in guild_rows:
                 guild_id = row["guild_id"]
@@ -238,7 +238,7 @@ class ShopkeepBot(discord.Client):
         channel = self.get_channel(channel_id)
         shop_name = shop_data.get("shop_name", "My Shop")
 
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
             for receipt in receipts:
                 receipt.setdefault("shop_id", shop_id)
@@ -276,7 +276,7 @@ class ShopkeepBot(discord.Client):
             await message.channel.send("You need the **Manage Channels** permission to use this.")
             return
 
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             await db.update_guild_channel(conn, message.guild.id, message.channel.id)
             await conn.commit()
 
@@ -285,7 +285,7 @@ class ShopkeepBot(discord.Client):
         )
 
     async def _cmd_status(self, message: discord.Message, guild_id: int) -> None:
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             guild_row = await db.get_guild(conn, guild_id)
 
         if not guild_row:
@@ -304,7 +304,7 @@ class ShopkeepBot(discord.Client):
             if not token or exp < int(time.time()):
                 token = secrets.token_urlsafe(16)
                 exp = int(time.time()) + SETUP_TOKEN_TTL
-                async with await db.get_db() as conn:
+                async with db.get_db() as conn:
                     await db.refresh_setup_token(conn, guild_row["guild_id"], token, exp)
                     await conn.commit()
             connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{token}"
@@ -360,7 +360,7 @@ class ShopkeepBot(discord.Client):
         self, message: discord.Message, guild_id: int
     ) -> tuple[EtsyClient | None, int | None]:
         """Return (EtsyClient, shop_id) for the guild, or send an error and return (None, None)."""
-        async with await db.get_db() as conn:
+        async with db.get_db() as conn:
             guild_row = await db.get_guild(conn, guild_id)
 
         if not guild_row or not guild_row["etsy_shop_id"]:
