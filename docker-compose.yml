@@ -45,20 +45,6 @@ services:
     networks:
       - shopkeep-network
 
-  mock-etsy-api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.etsy
-    container_name: shopkeep-mock-api
-    restart: unless-stopped
-    profiles:
-      - dev
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./src/etsy:/app/src/etsy:ro
-    networks:
-      - shopkeep-network
 
 networks:
   shopkeep-network:

@@ -17,12 +17,11 @@ A multi-tenant Discord bot that posts Etsy order notifications to your server. E
 
 | Command | Description |
 |---|---|
-| `!shop` | Shows your shop name, location, total sales, and rating |
-| `!orders` | Lists open orders with buyer, total, and shipping status |
-| `!status` | Shows connection status and which Etsy shop is linked |
-| `!setchannel` | Sets the current channel as the order notification channel |
-
-See [`src/bot/COMMANDS.md`](src/bot/COMMANDS.md) for details.
+| `/help` | Lists all commands |
+| `/shop` | Shows your shop name, location, total sales, and rating |
+| `/orders` | Lists open orders from the last 30 days with buyer, total, and shipping status |
+| `/status` | Shows connection status and which Etsy shop is linked |
+| `/setchannel` | Sets the current channel as the order notification channel |
 
 ---
 
@@ -67,7 +66,7 @@ Each Discord server is independent — different servers can monitor different E
    tilt up
    ```
 
-   This builds the Docker images, starts the mock Etsy API, the bot, and the web server, and watches for file changes with auto-reload.
+   This builds the Docker images, starts the bot and web server, and watches for file changes with auto-reload.
 
 4. To stop:
 
@@ -90,26 +89,13 @@ Each Discord server is independent — different servers can monitor different E
 
 ---
 
-## Mock Etsy API
-
-A mock Etsy API is included so you can develop without real credentials.
-
-Tilt starts it automatically, or you can run it manually:
-
-```bash
-task mock-api   # runs on http://localhost:5000
-```
-
-See [`MOCK_ETSY_API.md`](MOCK_ETSY_API.md) for full documentation.
-
----
-
 ## Deployment
 
-Pushes to `main` trigger a GitHub Actions deploy to a k3s cluster.
+Merging a Release Please PR triggers a versioned release and deploy to k3s.
 
 - Docker images are published to GHCR: `ghcr.io/madisonewebb/shopkeep`
 - Manifests are applied via Kustomize from `manifests/`
+- The cluster is updated to run the specific release version (e.g. `v1.0.0`)
 
 ### First-time setup
 

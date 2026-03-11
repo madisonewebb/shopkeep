@@ -16,20 +16,6 @@ Discord bot container configuration.
 docker-compose build bot
 ```
 
-### `Dockerfile.etsy`
-Mock Etsy API server container configuration.
-
-**Base Image:** `python:3.12-slim`
-
-**What it runs:** Mock Etsy API from `src/etsy/mock_api.py`
-
-**Exposed Port:** 5000
-
-**Build:**
-```bash
-docker-compose build mock-etsy-api
-```
-
 ## Usage
 
 All Dockerfiles are referenced in `docker-compose.yml` at the project root.
