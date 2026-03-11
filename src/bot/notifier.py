@@ -37,43 +37,50 @@ def build_shop_embed(shop: dict) -> discord.Embed:
     return embed
 
 
-def build_order_embed(receipt: dict, shop_name: str) -> discord.Embed:
+def build_order_embed(receipt: dict, shop_name: str, new: bool = False) -> discord.Embed:
     """
-    Build a green Discord embed for a new order notification.
+    Build a Discord embed for an order notification.
 
     Args:
         receipt: A dict of receipt DB columns (snake_case).
         shop_name: Human-readable shop name shown in the footer.
+        new: If True, prefixes the title with "New Order"; otherwise "Order".
     """
     receipt_id = receipt.get("receipt_id", "?")
+    status = (receipt.get("status") or "Unknown").capitalize()
+    is_paid = receipt.get("is_paid")
+    is_shipped = receipt.get("is_shipped")
 
-    embed = discord.Embed(
-        title=f"New Order #{receipt_id}",
-        color=discord.Color.green(),
-    )
+    if status.lower() == "canceled":
+        color = discord.Color.red()
+    elif is_paid and not is_shipped:
+        color = discord.Color.orange()
+    else:
+        color = discord.Color.blurple()
 
-    # Buyer
-    embed.add_field(name="Buyer", value=receipt.get("name") or "Unknown", inline=True)
-
-    # Total
     amount = receipt.get("grandtotal_amount", 0)
     divisor = receipt.get("grandtotal_divisor") or 100
     currency = receipt.get("grandtotal_currency", "USD")
-    embed.add_field(name="Total", value=f"{amount / divisor:.2f} {currency}", inline=True)
+    total = f"${amount / divisor:.2f} {currency}"
+    buyer = receipt.get("name") or "Unknown"
 
-    # Status
-    embed.add_field(name="Status", value=receipt.get("status") or "Unknown", inline=True)
+    title = f"{'New Order' if new else 'Order'} #{receipt_id}"
+    embed = discord.Embed(
+        title=title,
+        description=f"**{buyer}** — {total}",
+        color=color,
+    )
 
-    # Paid / Shipped
-    embed.add_field(name="Paid", value="Yes" if receipt.get("is_paid") else "No", inline=True)
-    embed.add_field(name="Shipped", value="Yes" if receipt.get("is_shipped") else "No", inline=True)
+    embed.add_field(name="Status", value=status, inline=True)
+    embed.add_field(
+        name="Fulfillment",
+        value="Shipped" if is_shipped else "Not shipped",
+        inline=True,
+    )
 
-    # Optional gift message
-    gift_message = receipt.get("gift_message")
-    if gift_message:
+    if gift_message := receipt.get("gift_message"):
         embed.add_field(name="Gift Message", value=gift_message, inline=False)
 
-    # Timestamp
     create_timestamp = receipt.get("create_timestamp")
     if create_timestamp:
         embed.timestamp = datetime.fromtimestamp(create_timestamp, tz=timezone.utc)

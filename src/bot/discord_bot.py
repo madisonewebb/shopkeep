@@ -248,7 +248,7 @@ class ShopkeepBot(discord.Client):
             unnotified = await db.get_unnotified_receipts(conn, shop_id)
             for row in unnotified:
                 if channel:
-                    embed = build_order_embed(dict(row), shop_name=shop_name)
+                    embed = build_order_embed(dict(row), shop_name=shop_name, new=True)
                     await channel.send(embed=embed)
                 await db.mark_receipt_notified(conn, row["receipt_id"])
                 await conn.commit()
@@ -333,19 +333,23 @@ class ShopkeepBot(discord.Client):
         if not etsy:
             return
         loop = asyncio.get_running_loop()
+        min_created = int(time.time()) - 30 * 24 * 3600
         try:
             shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
             response = await loop.run_in_executor(
-                None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
+                None, lambda: etsy.get_shop_receipts(shop_id, limit=50, min_created=min_created)
             )
         except Exception as exc:
             await message.channel.send(f"Failed to fetch orders: {exc}")
             return
-        receipts = response.get("results", [])
+        receipts = [
+            r for r in response.get("results", [])
+            if (r.get("status") or "").lower() != "completed"
+        ]
         shop_name = shop_data.get("shop_name", "My Shop")
 
         if not receipts:
-            await message.channel.send("No orders found.")
+            await message.channel.send("No open orders in the last 30 days.")
             return
 
         for receipt in receipts:
