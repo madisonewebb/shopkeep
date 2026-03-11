@@ -45,37 +45,3 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ env.WEB_IMAGE }}:latest,${{ env.WEB_IMAGE }}:${{ github.sha }}
 
-  deploy:
-    needs: build
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: tale/kubectl-action@v1
-        with:
-          base64-kube-config: ${{ secrets.KUBECONFIG_DATA }}
-
-      - name: Sync secrets
-        run: |
-          kubectl create secret generic shopkeep-secrets \
-            --from-literal=DISCORD_BOT_TOKEN=${{ secrets.DISCORD_BOT_TOKEN }} \
-            --from-literal=ETSY_API_KEY=${{ secrets.ETSY_API_KEY }} \
-            --from-literal=ETSY_SHARED_SECRET=${{ secrets.ETSY_SHARED_SECRET }} \
-            --from-literal=ETSY_WEB_REDIRECT_URI=${{ secrets.ETSY_WEB_REDIRECT_URI }} \
-            --from-literal=DISCORD_CLIENT_ID=${{ secrets.DISCORD_CLIENT_ID }} \
-            --from-literal=WEB_BASE_URL=${{ secrets.WEB_BASE_URL }} \
-            -n shopkeep \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: Apply manifests
-        run: kubectl apply -k manifests/
-
-      - name: Rollout restart
-        run: |
-          kubectl rollout restart deployment/shopkeep-bot -n shopkeep
-          kubectl rollout restart deployment/shopkeep-web -n shopkeep
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/shopkeep-bot -n shopkeep --timeout=120s
-          kubectl rollout status deployment/shopkeep-web -n shopkeep --timeout=120s
