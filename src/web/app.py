@@ -67,7 +67,7 @@ def index():
         f"https://discord.com/oauth2/authorize"
         f"?client_id={DISCORD_CLIENT_ID}"
         f"&permissions=2048"
-        f"&scope=bot"
+        f"&scope=bot%20applications.commands"
     )
     return render_template("index.html", invite_url=invite_url)
 
