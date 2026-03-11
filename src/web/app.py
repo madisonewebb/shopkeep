@@ -28,6 +28,7 @@ load_dotenv()
 app = Flask(__name__)
 
 ETSY_API_KEY = os.environ["ETSY_API_KEY"]
+ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
 ETSY_REDIRECT_URI = os.environ["ETSY_WEB_REDIRECT_URI"]
 DISCORD_CLIENT_ID = os.environ["DISCORD_CLIENT_ID"]
 WEB_BASE_URL = os.environ["WEB_BASE_URL"]
@@ -147,7 +148,7 @@ def etsy_callback():
     shop_resp = requests.get(
         f"{ETSY_API_BASE}/application/users/{user_id}/shops",
         headers={
-            "x-api-key": ETSY_API_KEY,
+            "x-api-key": f"{ETSY_API_KEY}:{ETSY_SHARED_SECRET}",
             "Authorization": f"Bearer {access_token}",
         },
     )
