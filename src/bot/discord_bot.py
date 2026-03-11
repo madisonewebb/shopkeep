@@ -321,7 +321,11 @@ class ShopkeepBot(discord.Client):
         if not etsy:
             return
         loop = asyncio.get_running_loop()
-        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
+        try:
+            shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
+        except Exception as exc:
+            await message.channel.send(f"Failed to fetch shop info: {exc}")
+            return
         await message.channel.send(embed=build_shop_embed(shop_data))
 
     async def _cmd_orders(self, message: discord.Message, guild_id: int) -> None:
@@ -329,10 +333,14 @@ class ShopkeepBot(discord.Client):
         if not etsy:
             return
         loop = asyncio.get_running_loop()
-        shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
-        response = await loop.run_in_executor(
-            None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
-        )
+        try:
+            shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
+            response = await loop.run_in_executor(
+                None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
+            )
+        except Exception as exc:
+            await message.channel.send(f"Failed to fetch orders: {exc}")
+            return
         receipts = response.get("results", [])
         shop_name = shop_data.get("shop_name", "My Shop")
 
