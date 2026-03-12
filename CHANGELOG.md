@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/madisonewebb/shopkeep/compare/v1.0.0...v1.1.0) (2026-03-12)
+
+
+### Features
+
+* fontend redesign ([9e15d22](https://github.com/madisonewebb/shopkeep/commit/9e15d22ea218f69814b0b376aebc108146405416))
+* redesign web frontend and add new pages ([1eccbd6](https://github.com/madisonewebb/shopkeep/commit/1eccbd61b40d6aebdaa36c98b31e9eaea930a4db))
+
+
+### Documentation
+
+* add shopkeepbot.com to README ([466739a](https://github.com/madisonewebb/shopkeep/commit/466739a2f4fded323bb2a13de14c67008a5ace94))
+
 ## 1.0.0 (2026-03-11)
 
 
