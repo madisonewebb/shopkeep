@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - Shopkeep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg: '#07070f',
+              surface: '#0f0f1a',
+              s2: '#16162a',
+              s3: '#1e1e33',
+              border: '#252540',
+              brite: '#3b3b6e',
+              indigo: '#6366f1',
+              blue: '#3b82f6',
+              lindigo: '#a5b4fc',
+              lblue: '#93c5fd',
+              text: '#f0f0ff',
+              muted: '#8b8baf',
+              dim: '#4a4a72',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            body: ['Figtree', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #07070f;
+      background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+      min-height: 100vh;
+    }
+    .main-nav {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(7, 7, 15, 0.8);
+      border-bottom: 1px solid #252540;
+    }
+    .divider { height: 1px; background: #252540; }
+    .section-title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+      margin-bottom: 0.6rem;
+    }
+    .prose-section { margin-bottom: 2rem; }
+    .prose-section p {
+      color: #8b8baf;
+      line-height: 1.75;
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+  </style>
+</head>
+<body class="font-body text-sk-text antialiased">
+
+  <nav class="main-nav fixed top-0 left-0 right-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+      <div class="hidden md:flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
+        <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
+        <a href="/about" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">About</a>
+        <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
+        <a href="/terms" class="px-3 py-1.5 text-sm text-sk-text rounded-md">Terms</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-28 pb-24 px-6">
+    <div class="max-w-2xl mx-auto">
+
+      <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-4">Legal</p>
+      <h1 class="font-display font-bold text-4xl tracking-tight mb-2">Terms of Service</h1>
+      <p class="text-sk-dim font-mono text-xs mb-12">Last updated: 2026</p>
+
+      <div class="divider mb-10"></div>
+
+      <div class="prose-section">
+        <h2 class="section-title">Acceptance</h2>
+        <p>By adding Shopkeep to your Discord server and connecting your Etsy account, you agree to these terms. If you do not agree, please remove the bot from your server.</p>
+      </div>
+
+      <div class="prose-section">
+        <h2 class="section-title">Use of the service</h2>
+        <p>Shopkeep is provided as a convenience tool for Etsy sellers. You agree to use it only for lawful purposes and in accordance with Discord's and Etsy's terms of service.</p>
+        <p>You are responsible for maintaining the security of your Discord server and your Etsy account.</p>
+      </div>
+
+      <div class="prose-section">
+        <h2 class="section-title">No warranties</h2>
+        <p>Shopkeep is provided as-is, without any warranty of any kind. We do not guarantee uptime, accuracy of notifications, or uninterrupted access to the service. Notifications may be delayed or missed due to API rate limits, network issues, or other factors outside our control.</p>
+        <p>Do not rely on Shopkeep as your sole source of order management. Always verify orders directly in your Etsy seller dashboard.</p>
+      </div>
+
+      <div class="prose-section">
+        <h2 class="section-title">Limitation of liability</h2>
+        <p>To the maximum extent permitted by applicable law, we are not liable for any damages arising from your use of or inability to use Shopkeep, including missed order notifications or data loss.</p>
+      </div>
+
+      <div class="prose-section">
+        <h2 class="section-title">Availability</h2>
+        <p>We reserve the right to modify, suspend, or discontinue Shopkeep at any time, with or without notice. We are not liable for any modification, suspension, or discontinuation of the service.</p>
+      </div>
+
+      <div class="prose-section">
+        <h2 class="section-title">Changes to these terms</h2>
+        <p>We may update these terms from time to time. Continued use of Shopkeep after changes are posted constitutes acceptance of the revised terms.</p>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="border-t border-sk-border py-8 px-6">
+    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <span class="font-display font-semibold text-sm text-sk-dim">Shopkeep</span>
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-sk-dim">
+        <a href="/" class="hover:text-sk-muted transition-colors">Home</a>
+        <a href="/commands" class="hover:text-sk-muted transition-colors">Commands</a>
+        <a href="/about" class="hover:text-sk-muted transition-colors">About</a>
+        <a href="/privacy" class="hover:text-sk-muted transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-sk-muted transition-colors">Terms of Service</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

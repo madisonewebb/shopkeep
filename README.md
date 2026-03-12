@@ -4,6 +4,8 @@
 
 A multi-tenant Discord bot that posts Etsy order notifications to your server. Each Discord server connects to its own Etsy shop via OAuth.
 
+**Website:** [shopkeepbot.com](https://shopkeepbot.com)
+
 ---
 
 ## What it does
@@ -38,7 +40,11 @@ Each Discord server is independent — different servers can monitor different E
 
 ## Getting started
 
-### Prerequisites
+### Add to your server
+
+Visit [shopkeepbot.com](https://shopkeepbot.com) to add Shopkeep to your Discord server. Full command reference is at [shopkeepbot.com/commands](https://shopkeepbot.com/commands).
+
+### Prerequisites (self-hosting)
 
 - Docker & [Tilt](https://tilt.dev/)
 - A Discord bot token ([create one here](https://discord.com/developers/applications))
