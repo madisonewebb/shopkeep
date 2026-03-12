@@ -170,6 +170,26 @@ def etsy_callback():
     return render_template("success.html", shop_name=shop["shop_name"])
 
 
+@app.route("/commands")
+def commands():
+    return render_template("commands.html")
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
 @app.route("/health")
 def health():
     return {"status": "ok"}

@@ -3,24 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connected! — Shopkeep</title>
+  <title>Connected - Shopkeep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg: '#07070f',
+              surface: '#0f0f1a',
+              s2: '#16162a',
+              s3: '#1e1e33',
+              border: '#252540',
+              brite: '#3b3b6e',
+              indigo: '#6366f1',
+              blue: '#3b82f6',
+              lindigo: '#a5b4fc',
+              lblue: '#93c5fd',
+              text: '#f0f0ff',
+              muted: '#8b8baf',
+              dim: '#4a4a72',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            body: ['Figtree', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f9f6f2; color: #333; }
-    .card { max-width: 480px; margin: 80px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 16px rgba(0,0,0,.08); text-align: center; }
-    .icon { font-size: 3rem; margin-bottom: 16px; }
-    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; }
-    p { color: #555; line-height: 1.6; margin-bottom: 16px; }
-    code { background: #f4f4f4; padding: 2px 7px; border-radius: 4px; font-size: .95em; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #07070f;
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+      min-height: 100vh;
+    }
+    .card {
+      background: #0f0f1a;
+      border: 1px solid #252540;
+      border-radius: 16px;
+    }
+    .success-dot {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(52, 211, 153, 0.1);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: #16162a;
+      border: 1px solid #252540;
+      border-radius: 8px;
+    }
+    .cmd-row code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #93c5fd;
+    }
   </style>
 </head>
-<body>
-  <div class="card">
-    <div class="icon">✅</div>
-    <h1>{{ shop_name }} is connected!</h1>
-    <p>Shopkeep is now monitoring your Etsy shop for new orders.</p>
-    <p>Go to Discord and type <code>/setchannel</code> in the channel where you want order notifications to appear.</p>
-    <p>You can also use <code>/shop</code> to see your shop info and <code>/orders</code> to list recent orders.</p>
+<body class="font-body text-sk-text antialiased">
+
+  <div class="min-h-screen flex flex-col">
+    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+    </header>
+
+    <main class="flex-1 flex items-center justify-center px-6 py-16">
+      <div class="card w-full max-w-sm p-8">
+        <div class="success-dot mb-6">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8L7 12L13 5" stroke="#34d399" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-3">Connected</p>
+        <h1 class="font-display font-bold text-2xl tracking-tight mb-3">{{ shop_name }} is live</h1>
+        <p class="text-sm text-sk-muted leading-relaxed mb-7">
+          Shopkeep is monitoring your Etsy shop. Finish setup in Discord with these commands.
+        </p>
+        <div class="grid gap-2">
+          <div class="cmd-row">
+            <code>/setchannel</code>
+            <span class="text-xs text-sk-muted">Pick where notifications go</span>
+          </div>
+          <div class="cmd-row">
+            <code>/shop</code>
+            <span class="text-xs text-sk-muted">View shop info</span>
+          </div>
+          <div class="cmd-row">
+            <code>/orders</code>
+            <span class="text-xs text-sk-muted">List recent orders</span>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
+
 </body>
 </html>
