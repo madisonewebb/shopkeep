@@ -19,20 +19,26 @@ def build_shop_embed(shop: dict) -> discord.Embed:
         color=discord.Color.blurple(),
     )
 
-    if location := shop.get("location"):
-        embed.add_field(name="Location", value=location, inline=True)
+    if announcement := shop.get("announcement"):
+        embed.description = announcement[:500]
 
-    sales = shop.get("transaction_sold_count")
-    if sales is not None:
-        embed.add_field(name="Sales", value=str(sales), inline=True)
+    if shop.get("is_vacation"):
+        embed.add_field(name="Status", value="On Vacation", inline=True)
 
-    review_avg = shop.get("review_average")
-    review_count = shop.get("review_count")
-    if review_avg is not None:
-        value = f"{review_avg:.1f} ★"
-        if review_count is not None:
-            value += f" ({review_count} reviews)"
-        embed.add_field(name="Rating", value=value, inline=True)
+    active = shop.get("listing_active_count")
+    if active is not None:
+        embed.add_field(name="Active Listings", value=str(active), inline=True)
+
+    digital = shop.get("digital_listing_count")
+    if digital is not None:
+        embed.add_field(name="Digital Listings", value=str(digital), inline=True)
+
+    favorers = shop.get("num_favorers")
+    if favorers is not None:
+        embed.add_field(name="Favorites", value=str(favorers), inline=True)
+
+    if currency := shop.get("currency_code"):
+        embed.add_field(name="Currency", value=currency, inline=True)
 
     return embed
 

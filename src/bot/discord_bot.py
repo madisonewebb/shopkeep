@@ -49,14 +49,18 @@ class OrdersView(discord.ui.View):
         await interaction.response.edit_message(embed=self.pages[self.current], view=self)
 
 
-def _build_orders_pages(receipts: list[dict], shop_name: str) -> list[discord.Embed]:
+def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str = "") -> list[discord.Embed]:
     total = len(receipts)
     total_pages = (total + _ORDERS_PAGE_SIZE - 1) // _ORDERS_PAGE_SIZE
     pages = []
+    description = f"{total} order{'s' if total != 1 else ''}"
+    if revenue_str:
+        description += f" · {revenue_str} total"
     for page_num, i in enumerate(range(0, total, _ORDERS_PAGE_SIZE), start=1):
         chunk = receipts[i:i + _ORDERS_PAGE_SIZE]
         embed = discord.Embed(
-            title=f"Open Orders ({total})",
+            title="Orders",
+            description=description,
             color=discord.Color.orange(),
         )
         for r in chunk:
@@ -89,6 +93,7 @@ class ShopkeepBot(discord.Client):
         self.etsy_clients: dict[int, EtsyClient] = {}
         self._bootstrapped_guilds: set[int] = set()
         self._bootstrapped = False
+        self._last_polled: dict[int, int] = {}
 
     async def setup_hook(self):
         db.DB_PATH = DB_PATH_ENV
@@ -206,8 +211,8 @@ class ShopkeepBot(discord.Client):
                     f"Thanks for adding Shopkeep to **{guild.name}**!\n\n"
                     f"Connect your Etsy shop to start receiving order notifications:\n"
                     f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
-                    f"After connecting, use `!setchannel` in any channel to choose "
-                    f"where order notifications are posted. Use `/setchannel` in any channel to set it."
+                    f"After connecting, use `/setchannel` in any channel to choose "
+                    f"where order notifications are posted."
                 )
             except discord.Forbidden:
                 pass  # Owner has DMs disabled
@@ -316,6 +321,8 @@ class ShopkeepBot(discord.Client):
                 await db.mark_receipt_notified(conn, row["receipt_id"])
                 await conn.commit()
 
+        self._last_polled[guild_id] = int(time.time())
+
     # ── Commands ──────────────────────────────────────────────────────────────
 
     def _setup_slash_commands(self) -> None:
@@ -337,19 +344,32 @@ class ShopkeepBot(discord.Client):
         async def shop(interaction: discord.Interaction):
             await self._cmd_shop(interaction)
 
-        @tree.command(name="orders", description="Show open orders from the last 30 days")
-        async def orders(interaction: discord.Interaction):
-            await self._cmd_orders(interaction)
+        @tree.command(name="orders", description="Show orders from your Etsy shop")
+        @discord.app_commands.describe(
+            days="Number of days to look back (default: 30)",
+            status="Which orders to show (default: open only)",
+        )
+        @discord.app_commands.choices(status=[
+            discord.app_commands.Choice(name="Open (default)", value="open"),
+            discord.app_commands.Choice(name="All", value="all"),
+            discord.app_commands.Choice(name="Completed", value="completed"),
+            discord.app_commands.Choice(name="Canceled", value="canceled"),
+        ])
+        async def orders(interaction: discord.Interaction, days: int = 30, status: str = "open"):
+            await self._cmd_orders(interaction, days=days, status_filter=status)
 
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message(
-            "**Shopkeep Commands**\n"
-            "`/help` — List all commands\n"
-            "`/status` — Show Etsy connection and notification channel\n"
-            "`/setchannel` — Set this channel for order notifications\n"
-            "`/shop` — Show your Etsy shop info\n"
-            "`/orders` — Show open orders from the last 30 days"
-        )
+        embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
+        commands = [
+            ("/help", "List all commands"),
+            ("/status", "Show Etsy connection and notification channel"),
+            ("/setchannel", "Set this channel for order notifications"),
+            ("/shop", "Show your Etsy shop info"),
+            ("/orders [days] [status]", "Show orders (default: last 30 days, open only)"),
+        ]
+        for name, desc in commands:
+            embed.add_field(name=name, value=desc, inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_setchannel(self, interaction: discord.Interaction) -> None:
         if not interaction.user.guild_permissions.manage_channels:
@@ -363,25 +383,53 @@ class ShopkeepBot(discord.Client):
             await conn.commit()
 
         await interaction.response.send_message(
-            f"Order notifications will be posted in <#{interaction.channel_id}>."
+            f"Order notifications will be posted in <#{interaction.channel_id}>.",
+            ephemeral=True,
         )
 
     async def _cmd_status(self, interaction: discord.Interaction) -> None:
         async with db.get_db() as conn:
             guild_row = await db.get_guild(conn, interaction.guild_id)
+            shop_row = None
+            if guild_row and guild_row["etsy_shop_id"]:
+                cursor = await conn.execute(
+                    "SELECT shop_name, url FROM shops WHERE shop_id = ?",
+                    (guild_row["etsy_shop_id"],),
+                )
+                shop_row = await cursor.fetchone()
 
         if not guild_row:
             await interaction.response.send_message(
-                "This server hasn't been set up yet. Add Shopkeep via the website."
+                "This server hasn't been set up yet. Add Shopkeep via the website.",
+                ephemeral=True,
             )
             return
 
         shop_id = guild_row["etsy_shop_id"]
         channel_id = guild_row["order_channel_id"]
-        etsy_status = f"Connected (shop ID: {shop_id})" if shop_id else "Not connected"
-        channel_status = f"<#{channel_id}>" if channel_id else "Not set — use `/setchannel`"
 
-        connect_link = ""
+        embed = discord.Embed(title="Shopkeep Status", color=discord.Color.blurple())
+
+        if shop_id and shop_row:
+            shop_name = shop_row["shop_name"]
+            shop_url = shop_row["url"]
+            etsy_value = f"[{shop_name}]({shop_url})" if shop_url else shop_name
+        elif shop_id:
+            etsy_value = f"Connected (shop ID: {shop_id})"
+        else:
+            etsy_value = "Not connected"
+        embed.add_field(name="Etsy Shop", value=etsy_value, inline=True)
+
+        embed.add_field(
+            name="Notifications",
+            value=f"<#{channel_id}>" if channel_id else "Not set — use `/setchannel`",
+            inline=True,
+        )
+
+        last_poll = self._last_polled.get(interaction.guild_id)
+        if last_poll:
+            embed.add_field(name="Last Poll", value=f"<t:{last_poll}:R>", inline=True)
+
         if WEB_BASE_URL and not shop_id:
             token = guild_row["setup_token"]
             exp = guild_row["setup_token_exp"] or 0
@@ -391,14 +439,13 @@ class ShopkeepBot(discord.Client):
                 async with db.get_db() as conn:
                     await db.refresh_setup_token(conn, guild_row["guild_id"], token, exp)
                     await conn.commit()
-            connect_link = f"\nConnect your shop: {WEB_BASE_URL}/connect/{token}"
+            embed.add_field(
+                name="Setup",
+                value=f"[Connect your Etsy shop]({WEB_BASE_URL}/connect/{token})",
+                inline=False,
+            )
 
-        await interaction.response.send_message(
-            f"**Shopkeep Status**\n"
-            f"Etsy: {etsy_status}\n"
-            f"Notifications: {channel_status}"
-            f"{connect_link}"
-        )
+        await interaction.response.send_message(embed=embed)
 
     async def _cmd_shop(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer()
@@ -413,13 +460,15 @@ class ShopkeepBot(discord.Client):
             return
         await interaction.followup.send(embed=build_shop_embed(shop_data))
 
-    async def _cmd_orders(self, interaction: discord.Interaction) -> None:
+    async def _cmd_orders(
+        self, interaction: discord.Interaction, days: int = 30, status_filter: str = "open"
+    ) -> None:
         await interaction.response.defer()
         etsy, shop_id = await self._get_etsy_client(interaction)
         if not etsy:
             return
         loop = asyncio.get_running_loop()
-        min_created = int(time.time()) - 30 * 24 * 3600
+        min_created = int(time.time()) - days * 24 * 3600
         try:
             shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
             response = await loop.run_in_executor(
@@ -428,17 +477,30 @@ class ShopkeepBot(discord.Client):
         except Exception as exc:
             await interaction.followup.send(f"Failed to fetch orders: {exc}")
             return
-        receipts = [
-            r for r in response.get("results", [])
-            if (r.get("status") or "").lower() != "completed"
-        ]
+
+        all_receipts = response.get("results", [])
+        if status_filter == "open":
+            receipts = [r for r in all_receipts if (r.get("status") or "").lower() not in ("completed", "canceled")]
+        elif status_filter == "completed":
+            receipts = [r for r in all_receipts if (r.get("status") or "").lower() == "completed"]
+        elif status_filter == "canceled":
+            receipts = [r for r in all_receipts if (r.get("status") or "").lower() == "canceled"]
+        else:
+            receipts = all_receipts
+
         shop_name = shop_data.get("shop_name", "My Shop")
 
         if not receipts:
-            await interaction.followup.send("No open orders in the last 30 days.")
+            label = f"{status_filter} " if status_filter != "all" else ""
+            await interaction.followup.send(f"No {label}orders in the last {days} days.")
             return
 
-        pages = _build_orders_pages(receipts, shop_name)
+        total_cents = sum((r.get("grandtotal") or {}).get("amount", 0) for r in receipts)
+        divisor = (receipts[0].get("grandtotal") or {}).get("divisor") or 100
+        currency = (receipts[0].get("grandtotal") or {}).get("currency_code", "USD")
+        revenue_str = f"${total_cents / divisor:.2f} {currency}"
+
+        pages = _build_orders_pages(receipts, shop_name, revenue_str=revenue_str)
         if len(pages) == 1:
             await interaction.followup.send(embed=pages[0])
         else:
