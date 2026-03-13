@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/madisonewebb/shopkeep/compare/v1.1.0...v1.2.0) (2026-03-13)
+
+
+### Features
+
+* add Etsy trademark disclaimer to all page footers ([ff11afc](https://github.com/madisonewebb/shopkeep/commit/ff11afcc986798a5664a238788091357171b559b))
+* improve slash commands and fix embed field ([09576ef](https://github.com/madisonewebb/shopkeep/commit/09576ef0466e86123084f53aba908c3d294d7b8e))
+
 ## [1.1.0](https://github.com/madisonewebb/shopkeep/compare/v1.0.0...v1.1.0) (2026-03-12)
 
 
