@@ -7,7 +7,7 @@ on:
     branches: [develop]
 
 jobs:
-  lint:
+  ci:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,3 +38,6 @@ jobs:
 
     - name: Run linters
       run: task lint
+
+    - name: Run tests
+      run: task test

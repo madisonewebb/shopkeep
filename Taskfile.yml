@@ -19,6 +19,11 @@ tasks:
     deps:
       - install-dev
 
+  test:
+    desc: Run tests with pytest
+    cmds:
+      - pytest
+
   lint:
     desc: Run all linters
     cmds:
