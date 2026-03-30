@@ -8,6 +8,34 @@ from datetime import datetime, timezone
 import discord
 
 
+def build_welcome_embed(guild_name: str, setup_url: str) -> discord.Embed:
+    """Build the welcome DM embed sent to a guild owner when the bot joins."""
+    embed = discord.Embed(
+        title="Welcome to Shopkeep!",
+        description=(
+            "Shopkeep connects your Etsy shop to Discord so you never miss a sale. "
+            "Get real-time order notifications posted directly to your server."
+        ),
+        color=discord.Color.orange(),
+    )
+    embed.add_field(
+        name="Get started",
+        value=f"[Connect your Etsy shop]({setup_url}) to authorize Shopkeep.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Then in {guild_name}".format(guild_name=guild_name),
+        value="Run `/setchannel` to choose which channel receives order notifications.",
+        inline=False,
+    )
+    embed.add_field(
+        name="Need help?",
+        value="Run `/help` in your server to see all available commands.",
+        inline=False,
+    )
+    return embed
+
+
 def build_shop_embed(shop: dict) -> discord.Embed:
     """Build a Discord embed for shop info from an API shop dict."""
     name = shop.get("shop_name", "Shop")
