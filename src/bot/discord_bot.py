@@ -8,7 +8,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_order_embed, build_shop_embed
+from src.bot.notifier import build_order_embed, build_shop_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -186,12 +186,9 @@ class ShopkeepBot(discord.Client):
             print(f"[register] New guild found: '{guild.name}' ({guild.id})")
             if WEB_BASE_URL and guild.owner:
                 try:
-                    await guild.owner.send(
-                        f"Hi! Shopkeep needs to be connected to your Etsy shop for **{guild.name}**.\n\n"
-                        f"Complete setup here:\n"
-                        f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
-                        f"After connecting, use `/setchannel` to choose where order notifications go."
-                    )
+                    setup_url = f"{WEB_BASE_URL}/connect/{setup_token}"
+                    embed = build_welcome_embed(guild.name, setup_url)
+                    await guild.owner.send(embed=embed)
                 except discord.Forbidden:
                     pass
 
@@ -207,13 +204,9 @@ class ShopkeepBot(discord.Client):
 
         if WEB_BASE_URL and guild.owner:
             try:
-                await guild.owner.send(
-                    f"Thanks for adding Shopkeep to **{guild.name}**!\n\n"
-                    f"Connect your Etsy shop to start receiving order notifications:\n"
-                    f"{WEB_BASE_URL}/connect/{setup_token}\n\n"
-                    f"After connecting, use `/setchannel` in any channel to choose "
-                    f"where order notifications are posted."
-                )
+                setup_url = f"{WEB_BASE_URL}/connect/{setup_token}"
+                embed = build_welcome_embed(guild.name, setup_url)
+                await guild.owner.send(embed=embed)
             except discord.Forbidden:
                 pass  # Owner has DMs disabled
 
