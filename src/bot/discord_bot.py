@@ -360,6 +360,7 @@ class ShopkeepBot(discord.Client):
             None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
         )
         receipts = response.get("results", [])
+        raw_by_id = {r["receipt_id"]: r for r in receipts}
         channel = self.get_channel(channel_id)
         shop_name = shop_data.get("shop_name", "My Shop")
 
@@ -373,7 +374,13 @@ class ShopkeepBot(discord.Client):
             unnotified = await db.get_unnotified_receipts(conn, shop_id)
             for row in unnotified:
                 if channel:
-                    embed = build_order_embed(dict(row), shop_name=shop_name, new=True)
+                    raw = raw_by_id.get(row["receipt_id"], {})
+                    embed = build_order_embed(
+                        dict(row),
+                        shop_name=shop_name,
+                        new=True,
+                        transactions=raw.get("transactions", []),
+                    )
                     await channel.send(embed=embed)
                 await db.mark_receipt_notified(conn, row["receipt_id"])
                 await conn.commit()
