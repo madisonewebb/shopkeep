@@ -8,7 +8,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_order_embed, build_shop_embed, build_welcome_embed
+from src.bot.notifier import build_disconnect_embed, build_order_embed, build_shop_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -47,6 +47,36 @@ class OrdersView(discord.ui.View):
         self.current += 1
         self._update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+
+class ConfirmDisconnectView(discord.ui.View):
+    def __init__(self, bot: "ShopkeepBot", guild_id: int, shop_name: str):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.shop_name = shop_name
+
+    @discord.ui.button(label="Disconnect", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        setup_token = secrets.token_urlsafe(16)
+        setup_token_exp = int(time.time()) + SETUP_TOKEN_TTL
+        async with db.get_db() as conn:
+            await db.disconnect_guild(conn, self.guild_id, setup_token, setup_token_exp)
+            await conn.commit()
+
+        self.bot.etsy_clients.pop(self.guild_id, None)
+        self.bot._bootstrapped_guilds.discard(self.guild_id)
+        self.bot._last_polled.pop(self.guild_id, None)
+
+        self.stop()
+        await interaction.response.edit_message(
+            embed=build_disconnect_embed(self.shop_name), view=None
+        )
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(content="Disconnect canceled.", embed=None, view=None)
 
 
 def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str = "") -> list[discord.Embed]:
@@ -351,6 +381,10 @@ class ShopkeepBot(discord.Client):
         async def orders(interaction: discord.Interaction, days: int = 30, status: str = "open"):
             await self._cmd_orders(interaction, days=days, status_filter=status)
 
+        @tree.command(name="disconnect", description="Unlink your Etsy shop from this server")
+        async def disconnect(interaction: discord.Interaction):
+            await self._cmd_disconnect(interaction)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -359,6 +393,7 @@ class ShopkeepBot(discord.Client):
             ("/setchannel", "Set this channel for order notifications"),
             ("/shop", "Show your Etsy shop info"),
             ("/orders [days] [status]", "Show orders (default: last 30 days, open only)"),
+            ("/disconnect", "Unlink your Etsy shop from this server"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -498,6 +533,41 @@ class ShopkeepBot(discord.Client):
             await interaction.followup.send(embed=pages[0])
         else:
             await interaction.followup.send(embed=pages[0], view=OrdersView(pages))
+
+    async def _cmd_disconnect(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            await interaction.response.send_message(
+                "No Etsy shop is connected to this server.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            cursor = await conn.execute(
+                "SELECT shop_name FROM shops WHERE shop_id = ?", (guild_row["etsy_shop_id"],)
+            )
+            shop_row = await cursor.fetchone()
+        shop_name = shop_row["shop_name"] if shop_row else f"shop #{guild_row['etsy_shop_id']}"
+
+        embed = discord.Embed(
+            title="Disconnect Etsy Shop?",
+            description=(
+                f"This will unlink **{shop_name}** from this server, stop all order notifications, "
+                "and delete your stored OAuth tokens.\n\n"
+                "You can reconnect at any time using `/status`."
+            ),
+            color=discord.Color.red(),
+        )
+        view = ConfirmDisconnectView(self, interaction.guild_id, shop_name)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction

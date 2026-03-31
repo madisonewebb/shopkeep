@@ -71,6 +71,20 @@ def build_shop_embed(shop: dict) -> discord.Embed:
     return embed
 
 
+def build_disconnect_embed(shop_name: str) -> discord.Embed:
+    """Build the confirmation embed shown after a successful /disconnect."""
+    embed = discord.Embed(
+        title="Etsy Shop Disconnected",
+        description=(
+            f"**{shop_name}** has been unlinked from this server. "
+            "Order notifications have been stopped and your tokens have been removed.\n\n"
+            "To reconnect, run `/status` to get a new setup link."
+        ),
+        color=discord.Color.greyple(),
+    )
+    return embed
+
+
 def build_order_embed(receipt: dict, shop_name: str, new: bool = False) -> discord.Embed:
     """
     Build a Discord embed for an order notification.

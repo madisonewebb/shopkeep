@@ -446,3 +446,19 @@ async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> No
         "UPDATE receipts SET notified_at = ? WHERE receipt_id = ?",
         (int(time.time()), receipt_id),
     )
+
+
+async def disconnect_guild(
+    db: aiosqlite.Connection, guild_id: int, new_setup_token: str, new_setup_token_exp: int
+) -> None:
+    """Remove Etsy credentials and clear shop association for a guild."""
+    await db.execute("DELETE FROM etsy_tokens WHERE guild_id = ?", (guild_id,))
+    await db.execute(
+        """
+        UPDATE guilds
+        SET etsy_shop_id = NULL, order_channel_id = NULL, connected_at = NULL,
+            setup_token = ?, setup_token_exp = ?
+        WHERE guild_id = ?
+        """,
+        (new_setup_token, new_setup_token_exp, guild_id),
+    )
