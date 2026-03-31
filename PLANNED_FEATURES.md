@@ -15,6 +15,7 @@ Order notifications: Bot polls Etsy every 60 seconds and posts a notification fo
 /orders [days] [status] - Paginated order list, filterable by status (open / completed / canceled / all), defaults to last 30 days
 /disconnect - Unlinks the Etsy shop from the server; clears OAuth tokens and stops notifications (requires Manage Server)
 /revenue [period] - Revenue summary for today, this week, or this month; shows total revenue, order count, and average order value
+/listings - Paginated browse of active Etsy listings; shows title, price, and quantity in stock (5 per page)
 
 
 PLANNED FEATURES
@@ -166,16 +167,6 @@ Example:
     Top 5 listings ranked by units sold in March
 
 
-12. /listings - Browse Active Listings
-
-What: A slash command to browse the shop's active listings from within Discord.
-
-Details:
-- Paginated (5 listings per page) with Previous / Next buttons
-- Each listing shows title, price, quantity in stock, and thumbnail
-- Data comes from the listings table, which is already synced every poll
-
-
 STRETCH GOALS
 
 S1. Shipping Presets (/preset)
@@ -247,7 +238,7 @@ SUMMARY
 
 Done:
 - OAuth onboarding + polling
-- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue
+- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings
 
 Planned:
 1.  Welcome message on bot join
@@ -261,7 +252,6 @@ Planned:
 9.  Daily digest (/digest)
 10. Revenue goal tracking (/goal)
 11. /bestsellers
-12. /listings
 
 Stretch:
 S1. Shipping presets (/preset)

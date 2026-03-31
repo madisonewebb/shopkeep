@@ -448,6 +448,21 @@ async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> No
     )
 
 
+async def get_active_listings(db: aiosqlite.Connection, shop_id: int) -> list:
+    """Return all active listings for a shop, ordered by title."""
+    cursor = await db.execute(
+        """
+        SELECT listing_id, title, quantity, url,
+               price_amount, price_divisor, price_currency_code
+        FROM listings
+        WHERE shop_id = ? AND state = 'active'
+        ORDER BY title ASC
+        """,
+        (shop_id,),
+    )
+    return await cursor.fetchall()
+
+
 async def get_receipts_since(
     db: aiosqlite.Connection, shop_id: int, since_timestamp: int
 ) -> list:
