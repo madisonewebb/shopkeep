@@ -448,6 +448,21 @@ async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> No
     )
 
 
+async def get_receipts_since(
+    db: aiosqlite.Connection, shop_id: int, since_timestamp: int
+) -> list:
+    """Return all non-canceled receipts for a shop created on or after since_timestamp."""
+    cursor = await db.execute(
+        """
+        SELECT grandtotal_amount, grandtotal_divisor, grandtotal_currency
+        FROM receipts
+        WHERE shop_id = ? AND create_timestamp >= ? AND LOWER(status) != 'canceled'
+        """,
+        (shop_id, since_timestamp),
+    )
+    return await cursor.fetchall()
+
+
 async def disconnect_guild(
     db: aiosqlite.Connection, guild_id: int, new_setup_token: str, new_setup_token_exp: int
 ) -> None:

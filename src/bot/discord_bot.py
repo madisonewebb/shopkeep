@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import secrets
 import time
@@ -385,6 +386,16 @@ class ShopkeepBot(discord.Client):
         async def disconnect(interaction: discord.Interaction):
             await self._cmd_disconnect(interaction)
 
+        @tree.command(name="revenue", description="Show revenue summary for a time period")
+        @discord.app_commands.describe(period="Time period to summarize (default: this month)")
+        @discord.app_commands.choices(period=[
+            discord.app_commands.Choice(name="Today", value="today"),
+            discord.app_commands.Choice(name="This week", value="this_week"),
+            discord.app_commands.Choice(name="This month", value="this_month"),
+        ])
+        async def revenue(interaction: discord.Interaction, period: str = "this_month"):
+            await self._cmd_revenue(interaction, period=period)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -394,6 +405,7 @@ class ShopkeepBot(discord.Client):
             ("/shop", "Show your Etsy shop info"),
             ("/orders [days] [status]", "Show orders (default: last 30 days, open only)"),
             ("/disconnect", "Unlink your Etsy shop from this server"),
+            ("/revenue [period]", "Show revenue summary (today / this week / this month)"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -568,6 +580,51 @@ class ShopkeepBot(discord.Client):
         )
         view = ConfirmDisconnectView(self, interaction.guild_id, shop_name)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    async def _cmd_revenue(self, interaction: discord.Interaction, period: str = "this_month") -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            await interaction.followup.send("No Etsy shop connected.")
+            return
+
+        shop_id = guild_row["etsy_shop_id"]
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if period == "today":
+            since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            label = f"Today · {now.strftime('%B %d, %Y')}"
+        elif period == "this_week":
+            since = (now - datetime.timedelta(days=now.weekday())).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            label = f"This Week · {since.strftime('%b %d')} – {now.strftime('%b %d, %Y')}"
+        else:
+            since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            label = f"This Month · {now.strftime('%B %Y')}"
+
+        async with db.get_db() as conn:
+            rows = await db.get_receipts_since(conn, shop_id, int(since.timestamp()))
+
+        order_count = len(rows)
+        if order_count == 0:
+            await interaction.followup.send(f"No orders found for {label}.")
+            return
+
+        total_amount = sum(r["grandtotal_amount"] for r in rows)
+        divisor = rows[0]["grandtotal_divisor"] or 100
+        currency = rows[0]["grandtotal_currency"] or "USD"
+        total = total_amount / divisor
+        avg = total / order_count
+
+        embed = discord.Embed(title="Revenue", description=label, color=discord.Color.green())
+        embed.add_field(name="Total Revenue", value=f"${total:,.2f} {currency}", inline=True)
+        embed.add_field(name="Orders", value=str(order_count), inline=True)
+        embed.add_field(name="Avg Order Value", value=f"${avg:,.2f} {currency}", inline=True)
+        await interaction.followup.send(embed=embed)
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction
