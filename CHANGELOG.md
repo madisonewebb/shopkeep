@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/madisonewebb/shopkeep/compare/v1.1.0...v1.2.0) (2026-04-01)
+
+
+### Features
+
+* add /disconnect command ([2ea65a6](https://github.com/madisonewebb/shopkeep/commit/2ea65a62752fbe239db32debe832a38eb28daf62))
+* add /listings command ([66bb0d2](https://github.com/madisonewebb/shopkeep/commit/66bb0d2e21de356f5afdea5ca901ebfa2e289031))
+* add /revenue command ([4cb996e](https://github.com/madisonewebb/shopkeep/commit/4cb996e3b2253261a5ef4ca4faaad44feaccc77a))
+* add basic test suite with CI integration ([8696af9](https://github.com/madisonewebb/shopkeep/commit/8696af91efd1af3e99058feb1c708ac9de0cf914))
+* add basic test suite with CI integration ([1d59a2f](https://github.com/madisonewebb/shopkeep/commit/1d59a2f51ab7fe24a90e635c2d4bf3ab65505faa))
+* add Etsy trademark disclaimer to all page footers ([ff11afc](https://github.com/madisonewebb/shopkeep/commit/ff11afcc986798a5664a238788091357171b559b))
+* improve slash commands and fix embed field ([09576ef](https://github.com/madisonewebb/shopkeep/commit/09576ef0466e86123084f53aba908c3d294d7b8e))
+* richer order notification embeds with items, receipt link, and thumbnail ([57f402e](https://github.com/madisonewebb/shopkeep/commit/57f402e14aacbe23c000d9ec0fee2e84bf37e810))
+* welcome message embed on guild join ([5a6dcd4](https://github.com/madisonewebb/shopkeep/commit/5a6dcd466f011a9bc3b1bc273b7e0b86c8d68311))
+* welcome message embed on guild join ([e02e3e4](https://github.com/madisonewebb/shopkeep/commit/e02e3e47cbd629924994dd13ba5914c504388911))
+
 ## [1.1.0](https://github.com/madisonewebb/shopkeep/compare/v1.0.0...v1.1.0) (2026-03-12)
 
 
