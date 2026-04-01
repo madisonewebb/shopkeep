@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import os
 import secrets
 import time
@@ -105,6 +106,39 @@ def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str =
             embed.add_field(
                 name=f"Order #{r.get('receipt_id')} — {buyer}",
                 value=f"{total_str} · {status} · {shipped}",
+                inline=False,
+            )
+        footer = shop_name if total_pages == 1 else f"Page {page_num} of {total_pages} · {shop_name}"
+        embed.set_footer(text=footer)
+        pages.append(embed)
+    return pages
+
+
+_LISTINGS_PAGE_SIZE = 5
+
+
+def _build_listings_pages(rows: list, shop_name: str) -> list[discord.Embed]:
+    total = len(rows)
+    total_pages = (total + _LISTINGS_PAGE_SIZE - 1) // _LISTINGS_PAGE_SIZE
+    pages = []
+    for page_num, i in enumerate(range(0, total, _LISTINGS_PAGE_SIZE), start=1):
+        chunk = rows[i:i + _LISTINGS_PAGE_SIZE]
+        embed = discord.Embed(
+            title="Active Listings",
+            description=f"{total} listing{'s' if total != 1 else ''}",
+            color=discord.Color.blurple(),
+        )
+        for r in chunk:
+            price = r["price_amount"] / (r["price_divisor"] or 100)
+            currency = r["price_currency_code"] or "USD"
+            qty = r["quantity"]
+            stock = f"{qty} in stock" if qty > 0 else "Out of stock"
+            title = r["title"]
+            url = r["url"]
+            name = f"[{title}]({url})" if url else title
+            embed.add_field(
+                name=name,
+                value=f"${price:.2f} {currency} · {stock}",
                 inline=False,
             )
         footer = shop_name if total_pages == 1 else f"Page {page_num} of {total_pages} · {shop_name}"
@@ -326,6 +360,7 @@ class ShopkeepBot(discord.Client):
             None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
         )
         receipts = response.get("results", [])
+        raw_by_id = {r["receipt_id"]: r for r in receipts}
         channel = self.get_channel(channel_id)
         shop_name = shop_data.get("shop_name", "My Shop")
 
@@ -339,7 +374,13 @@ class ShopkeepBot(discord.Client):
             unnotified = await db.get_unnotified_receipts(conn, shop_id)
             for row in unnotified:
                 if channel:
-                    embed = build_order_embed(dict(row), shop_name=shop_name, new=True)
+                    raw = raw_by_id.get(row["receipt_id"], {})
+                    embed = build_order_embed(
+                        dict(row),
+                        shop_name=shop_name,
+                        new=True,
+                        transactions=raw.get("transactions", []),
+                    )
                     await channel.send(embed=embed)
                 await db.mark_receipt_notified(conn, row["receipt_id"])
                 await conn.commit()
@@ -385,6 +426,20 @@ class ShopkeepBot(discord.Client):
         async def disconnect(interaction: discord.Interaction):
             await self._cmd_disconnect(interaction)
 
+        @tree.command(name="listings", description="Browse your active Etsy listings")
+        async def listings(interaction: discord.Interaction):
+            await self._cmd_listings(interaction)
+
+        @tree.command(name="revenue", description="Show revenue summary for a time period")
+        @discord.app_commands.describe(period="Time period to summarize (default: this month)")
+        @discord.app_commands.choices(period=[
+            discord.app_commands.Choice(name="Today", value="today"),
+            discord.app_commands.Choice(name="This week", value="this_week"),
+            discord.app_commands.Choice(name="This month", value="this_month"),
+        ])
+        async def revenue(interaction: discord.Interaction, period: str = "this_month"):
+            await self._cmd_revenue(interaction, period=period)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -394,6 +449,8 @@ class ShopkeepBot(discord.Client):
             ("/shop", "Show your Etsy shop info"),
             ("/orders [days] [status]", "Show orders (default: last 30 days, open only)"),
             ("/disconnect", "Unlink your Etsy shop from this server"),
+            ("/revenue [period]", "Show revenue summary (today / this week / this month)"),
+            ("/listings", "Browse your active Etsy listings"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -568,6 +625,80 @@ class ShopkeepBot(discord.Client):
         )
         view = ConfirmDisconnectView(self, interaction.guild_id, shop_name)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    async def _cmd_listings(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            await interaction.followup.send("No Etsy shop connected.")
+            return
+
+        async with db.get_db() as conn:
+            rows = await db.get_active_listings(conn, guild_row["etsy_shop_id"])
+            cursor = await conn.execute(
+                "SELECT shop_name FROM shops WHERE shop_id = ?", (guild_row["etsy_shop_id"],)
+            )
+            shop_row = await cursor.fetchone()
+
+        shop_name = shop_row["shop_name"] if shop_row else "My Shop"
+
+        if not rows:
+            await interaction.followup.send("No active listings found. Data syncs every 60 seconds — try again shortly.")
+            return
+
+        pages = _build_listings_pages(rows, shop_name)
+        if len(pages) == 1:
+            await interaction.followup.send(embed=pages[0])
+        else:
+            await interaction.followup.send(embed=pages[0], view=OrdersView(pages))
+
+    async def _cmd_revenue(self, interaction: discord.Interaction, period: str = "this_month") -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            await interaction.followup.send("No Etsy shop connected.")
+            return
+
+        shop_id = guild_row["etsy_shop_id"]
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if period == "today":
+            since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            label = f"Today · {now.strftime('%B %d, %Y')}"
+        elif period == "this_week":
+            since = (now - datetime.timedelta(days=now.weekday())).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            label = f"This Week · {since.strftime('%b %d')} – {now.strftime('%b %d, %Y')}"
+        else:
+            since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            label = f"This Month · {now.strftime('%B %Y')}"
+
+        async with db.get_db() as conn:
+            rows = await db.get_receipts_since(conn, shop_id, int(since.timestamp()))
+
+        order_count = len(rows)
+        if order_count == 0:
+            await interaction.followup.send(f"No orders found for {label}.")
+            return
+
+        total_amount = sum(r["grandtotal_amount"] for r in rows)
+        divisor = rows[0]["grandtotal_divisor"] or 100
+        currency = rows[0]["grandtotal_currency"] or "USD"
+        total = total_amount / divisor
+        avg = total / order_count
+
+        embed = discord.Embed(title="Revenue", description=label, color=discord.Color.green())
+        embed.add_field(name="Total Revenue", value=f"${total:,.2f} {currency}", inline=True)
+        embed.add_field(name="Orders", value=str(order_count), inline=True)
+        embed.add_field(name="Avg Order Value", value=f"${avg:,.2f} {currency}", inline=True)
+        await interaction.followup.send(embed=embed)
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction

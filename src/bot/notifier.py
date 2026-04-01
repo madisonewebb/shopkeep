@@ -85,7 +85,12 @@ def build_disconnect_embed(shop_name: str) -> discord.Embed:
     return embed
 
 
-def build_order_embed(receipt: dict, shop_name: str, new: bool = False) -> discord.Embed:
+def build_order_embed(
+    receipt: dict,
+    shop_name: str,
+    new: bool = False,
+    transactions: list | None = None,
+) -> discord.Embed:
     """
     Build a Discord embed for an order notification.
 
@@ -93,6 +98,8 @@ def build_order_embed(receipt: dict, shop_name: str, new: bool = False) -> disco
         receipt: A dict of receipt DB columns (snake_case).
         shop_name: Human-readable shop name shown in the footer.
         new: If True, prefixes the title with "New Order"; otherwise "Order".
+        transactions: Raw transaction list from the Etsy API receipt, used to
+            show listing titles and thumbnail.
     """
     receipt_id = receipt.get("receipt_id", "?")
     status = (receipt.get("status") or "Unknown").capitalize()
@@ -112,12 +119,24 @@ def build_order_embed(receipt: dict, shop_name: str, new: bool = False) -> disco
     total = f"${amount / divisor:.2f} {currency}"
     buyer = receipt.get("name") or "Unknown"
 
+    receipt_url = f"https://www.etsy.com/your_account/orders/{receipt_id}"
     title = f"{'New Order' if new else 'Order'} #{receipt_id}"
     embed = discord.Embed(
         title=title,
+        url=receipt_url,
         description=f"**{buyer}** — {total}",
         color=color,
     )
+
+    if transactions:
+        titles = [t["title"] for t in transactions if t.get("title")]
+        if titles:
+            embed.add_field(name="Items", value="\n".join(f"• {t}" for t in titles), inline=False)
+
+        first_image = transactions[0].get("listing_image") or {}
+        thumbnail_url = first_image.get("url_75x75") or first_image.get("url_170x135")
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
 
     embed.add_field(name="Status", value=status, inline=True)
     embed.add_field(
