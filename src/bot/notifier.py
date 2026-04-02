@@ -71,6 +71,31 @@ def build_shop_embed(shop: dict) -> discord.Embed:
     return embed
 
 
+def build_connected_embed(shop_name: str, no_channel: bool = False) -> discord.Embed:
+    """Build the embed posted when an Etsy shop is first connected.
+
+    If no_channel is True, the embed is sent as a DM to the guild owner and includes
+    a prompt to run /setchannel.
+    """
+    if no_channel:
+        description = (
+            f"**{shop_name}** is now linked to your server. "
+            "Run `/setchannel` in the channel where you'd like order notifications posted."
+        )
+    else:
+        description = (
+            f"**{shop_name}** is now linked to this server. "
+            "New order notifications will be posted in this channel.\n\n"
+            "Use `/setchannel` to change the notification channel, or `/shop` to see your shop info."
+        )
+    embed = discord.Embed(
+        title="Etsy Shop Connected",
+        description=description,
+        color=discord.Color.green(),
+    )
+    return embed
+
+
 def build_disconnect_embed(shop_name: str) -> discord.Embed:
     """Build the confirmation embed shown after a successful /disconnect."""
     embed = discord.Embed(
