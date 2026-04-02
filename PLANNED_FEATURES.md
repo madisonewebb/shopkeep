@@ -2,12 +2,15 @@
 Shopkeep - Planned Features
 
 
-WHAT'S ALREADY BUILT (updated 3/31/26)
+WHAT'S ALREADY BUILT (updated 4/2/26)
 
 The following are fully functional:
 
 OAuth 2.0 onboarding: Guild owners run /connect; bot DMs a setup link; owner authorizes with Etsy (PKCE flow)
 Order notifications: Bot polls Etsy every 60 seconds and posts a notification for every new order
+Welcome message on bot join: DMs the guild owner a setup link and onboarding instructions when the bot joins a new server
+Richer order notification embeds: New order notifications include item titles, a receipt link, and a listing thumbnail
+Connect/disconnect confirmation embeds: Posts a confirmation to the order channel when a shop is linked or unlinked; falls back to a DM to the guild owner if no channel is set
 /help - Lists all available commands
 /status - Shows the connected Etsy shop and the configured notification channel
 /setchannel - Sets which channel order notifications are posted to (requires Manage Channels)
@@ -20,27 +23,7 @@ Order notifications: Bot polls Etsy every 60 seconds and posts a notification fo
 
 PLANNED FEATURES
 
-1. Welcome Message on Bot Join
-
-What: When Shopkeep is added to a new Discord server, automatically send a welcome message to the server owner
-
-Details:
-- Triggered when the bot joins a new server
-- DM includes a brief description of what Shopkeep does, how to run /connect to get started, and a link to the
-- Acts as a built-in onboarding guide so new users aren't left wondering what to do next
-
-
-2. Richer Order Notification Embeds
-
-What: Improve the existing new-order notification to show what was actually purchased.
-
-Details:
-- Add the listing title(s) from the order's transactions
-- Add a direct link back to the receipt on Etsy
-- Add the item thumbnail image
-
-
-3. Order Status Change Notifications
+1. Order Status Change Notifications
 
 What: Post a follow-up notification when an existing order is marked as shipped or canceled.
 
@@ -238,20 +221,21 @@ SUMMARY
 
 Done:
 - OAuth onboarding + polling
+- Welcome message on bot join
+- Richer order notification embeds
+- Connect/disconnect confirmation embeds
 - /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings
 
 Planned:
-1.  Welcome message on bot join
-2.  Richer order notification embeds
-3.  Order status change notifications
-4.  Review notifications
-5.  Repeat customer callout
-6.  Shipping deadline reminders (/reminders)
-7.  Out-of-stock notifications
-8.  Order backlog warning
-9.  Daily digest (/digest)
-10. Revenue goal tracking (/goal)
-11. /bestsellers
+1.  Order status change notifications
+2.  Review notifications
+3.  Repeat customer callout
+4.  Shipping deadline reminders (/reminders)
+5.  Out-of-stock notifications
+6.  Order backlog warning
+7.  Daily digest (/digest)
+8.  Revenue goal tracking (/goal)
+9.  /bestsellers
 
 Stretch:
 S1. Shipping presets (/preset)
