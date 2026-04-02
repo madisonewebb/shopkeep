@@ -9,7 +9,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_disconnect_embed, build_order_embed, build_shop_embed, build_welcome_embed
+from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shop_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -51,11 +51,12 @@ class OrdersView(discord.ui.View):
 
 
 class ConfirmDisconnectView(discord.ui.View):
-    def __init__(self, bot: "ShopkeepBot", guild_id: int, shop_name: str):
+    def __init__(self, bot: "ShopkeepBot", guild_id: int, shop_name: str, channel_id: int | None):
         super().__init__(timeout=60)
         self.bot = bot
         self.guild_id = guild_id
         self.shop_name = shop_name
+        self.channel_id = channel_id
 
     @discord.ui.button(label="Disconnect", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -73,6 +74,11 @@ class ConfirmDisconnectView(discord.ui.View):
         await interaction.response.edit_message(
             embed=build_disconnect_embed(self.shop_name), view=None
         )
+
+        if self.channel_id and self.channel_id != interaction.channel_id:
+            channel = self.bot.get_channel(self.channel_id)
+            if channel:
+                await channel.send(embed=build_disconnect_embed(self.shop_name))
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -276,10 +282,10 @@ class ShopkeepBot(discord.Client):
 
     # ── Bootstrap ─────────────────────────────────────────────────────────────
 
-    async def _bootstrap_guild(self, guild_id: int, shop_id: int) -> None:
+    async def _bootstrap_guild(self, guild_id: int, shop_id: int) -> str:
         etsy = self.etsy_clients.get(guild_id)
         if not etsy:
-            return
+            return ""
 
         print(f"[bootstrap] guild={guild_id} shop={shop_id}")
         loop = asyncio.get_running_loop()
@@ -303,10 +309,12 @@ class ShopkeepBot(discord.Client):
                 await db.upsert_receipt(conn, receipt, already_seen=True)
             await conn.commit()
 
+        shop_name = shop_data.get("shop_name", "")
         print(
-            f"[bootstrap] Done — '{shop_data.get('shop_name')}', "
+            f"[bootstrap] Done — '{shop_name}', "
             f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
         )
+        return shop_name
 
     # ── Poll loop ─────────────────────────────────────────────────────────────
 
@@ -329,8 +337,20 @@ class ShopkeepBot(discord.Client):
             guild_id = row["guild_id"]
             if guild_id in self.etsy_clients and guild_id not in self._bootstrapped_guilds:
                 try:
-                    await self._bootstrap_guild(guild_id, row["etsy_shop_id"])
+                    shop_name = await self._bootstrap_guild(guild_id, row["etsy_shop_id"])
                     self._bootstrapped_guilds.add(guild_id)
+                    if shop_name:
+                        if row["order_channel_id"]:
+                            channel = self.get_channel(row["order_channel_id"])
+                            if channel:
+                                await channel.send(embed=build_connected_embed(shop_name))
+                        else:
+                            guild = self.get_guild(guild_id)
+                            if guild and guild.owner:
+                                try:
+                                    await guild.owner.send(embed=build_connected_embed(shop_name, no_channel=True))
+                                except discord.Forbidden:
+                                    pass
                 except Exception as exc:
                     print(f"[poller] bootstrap guild={guild_id} {exc}")
 
@@ -623,7 +643,7 @@ class ShopkeepBot(discord.Client):
             ),
             color=discord.Color.red(),
         )
-        view = ConfirmDisconnectView(self, interaction.guild_id, shop_name)
+        view = ConfirmDisconnectView(self, interaction.guild_id, shop_name, guild_row["order_channel_id"])
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     async def _cmd_listings(self, interaction: discord.Interaction) -> None:
