@@ -426,7 +426,41 @@ async def upsert_receipt(
             notified_at,
         ),
     )
-    return cursor.rowcount == 1
+    is_new = cursor.rowcount == 1
+
+    # For existing rows, keep status fields current (notified_at is preserved by INSERT OR IGNORE)
+    if not is_new:
+        await db.execute(
+            """
+            UPDATE receipts
+            SET is_shipped = ?, status = ?, update_timestamp = ?, fetched_at = ?
+            WHERE receipt_id = ?
+            """,
+            (
+                1 if receipt.get("is_shipped") else 0,
+                receipt.get("status", ""),
+                receipt.get("update_timestamp"),
+                int(time.time()),
+                receipt["receipt_id"],
+            ),
+        )
+
+    return is_new
+
+
+async def get_receipts_status_snapshot(
+    db: aiosqlite.Connection, receipt_ids: list
+) -> dict:
+    """Return {receipt_id: {"is_shipped": int, "status": str}} for all known receipt IDs."""
+    if not receipt_ids:
+        return {}
+    placeholders = ",".join("?" * len(receipt_ids))
+    cursor = await db.execute(
+        f"SELECT receipt_id, is_shipped, status FROM receipts WHERE receipt_id IN ({placeholders})",
+        receipt_ids,
+    )
+    rows = await cursor.fetchall()
+    return {row["receipt_id"]: {"is_shipped": row["is_shipped"], "status": row["status"]} for row in rows}
 
 
 async def get_unnotified_receipts(db: aiosqlite.Connection, shop_id: int) -> list:
