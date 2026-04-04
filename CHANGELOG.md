@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3.0](https://github.com/madisonewebb/shopkeep/compare/v1.2.0...v1.3.0) (2026-04-04)
+
+
+### Features
+
+* post confirmation embeds on shop connect and disconnect ([6482d99](https://github.com/madisonewebb/shopkeep/commit/6482d99b4f26f8bfce4a6b438be633c9abfc46fd))
+* post confirmation embeds on shop connect and disconnect ([9d79cd2](https://github.com/madisonewebb/shopkeep/commit/9d79cd28823c3b672aeb738b328501d24f345859))
+* post status change notifications when orders ship or cancel ([10be880](https://github.com/madisonewebb/shopkeep/commit/10be8804f7e9c0c0efed7f5c1e1c6b7b5802514b))
+* post status change notifications when orders ship or cancel ([5e4377e](https://github.com/madisonewebb/shopkeep/commit/5e4377ea82d2bfa37ff43478f26bc78262269d61))
+
+
+### Documentation
+
+* sync commands page and remove stale README command table ([adee2b8](https://github.com/madisonewebb/shopkeep/commit/adee2b8109848a4a70cc98dfef9f5f606efabe80))
+* sync commands page and remove stale README command table ([e079bd9](https://github.com/madisonewebb/shopkeep/commit/e079bd98370754ff6da18ad843bfcdedad4f1222))
+* update PLANNED_FEATURES with completed items and renumber ([365b3a3](https://github.com/madisonewebb/shopkeep/commit/365b3a361672052c828175b598c910878441692b))
+
 ## [1.2.0](https://github.com/madisonewebb/shopkeep/compare/v1.1.0...v1.2.0) (2026-04-01)
 
 
