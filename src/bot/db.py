@@ -95,6 +95,22 @@ CREATE TABLE IF NOT EXISTS listings (
 )
 """
 
+_CREATE_SHIPPING_PRESETS = """
+CREATE TABLE IF NOT EXISTS shipping_presets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id),
+    name       TEXT    NOT NULL,
+    carrier    TEXT    NOT NULL,
+    mail_class TEXT    NOT NULL,
+    weight_oz  REAL    NOT NULL,
+    length_in  REAL    NOT NULL,
+    width_in   REAL    NOT NULL,
+    height_in  REAL    NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(guild_id, name)
+)
+"""
+
 _CREATE_RECEIPTS = """
 CREATE TABLE IF NOT EXISTS receipts (
     receipt_id            INTEGER PRIMARY KEY,
@@ -140,6 +156,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_SHOPS)
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
+        await db.execute(_CREATE_SHIPPING_PRESETS)
         await db.commit()
 
 
@@ -510,6 +527,49 @@ async def get_receipts_since(
         (shop_id, since_timestamp),
     )
     return await cursor.fetchall()
+
+
+# ── Shipping preset helpers ───────────────────────────────────────────────────
+
+async def add_preset(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    name: str,
+    carrier: str,
+    mail_class: str,
+    weight_oz: float,
+    length_in: float,
+    width_in: float,
+    height_in: float,
+) -> bool:
+    """Insert a new preset. Returns True if inserted, False if name already exists."""
+    cursor = await db.execute(
+        """
+        INSERT OR IGNORE INTO shipping_presets
+            (guild_id, name, carrier, mail_class, weight_oz, length_in, width_in, height_in, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (guild_id, name, carrier, mail_class, weight_oz, length_in, width_in, height_in, int(time.time())),
+    )
+    return cursor.rowcount == 1
+
+
+async def list_presets(db: aiosqlite.Connection, guild_id: int) -> list:
+    """Return all presets for a guild, ordered by name."""
+    cursor = await db.execute(
+        "SELECT * FROM shipping_presets WHERE guild_id = ? ORDER BY name ASC",
+        (guild_id,),
+    )
+    return await cursor.fetchall()
+
+
+async def delete_preset(db: aiosqlite.Connection, guild_id: int, name: str) -> bool:
+    """Delete a preset by name. Returns True if a row was deleted."""
+    cursor = await db.execute(
+        "DELETE FROM shipping_presets WHERE guild_id = ? AND name = ?",
+        (guild_id, name),
+    )
+    return cursor.rowcount == 1
 
 
 async def disconnect_guild(

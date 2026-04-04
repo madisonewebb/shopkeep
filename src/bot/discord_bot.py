@@ -153,6 +153,38 @@ def _build_listings_pages(rows: list, shop_name: str) -> list[discord.Embed]:
     return pages
 
 
+def _parse_weight_oz(weight_str: str) -> float | None:
+    """Parse a weight string like '0.3lb', '4.8oz', or '5' (assumed oz). Returns oz or None."""
+    s = weight_str.strip().lower()
+    if s.endswith("lbs") or s.endswith("lb"):
+        num_str = s.rstrip("slb")
+        try:
+            return float(num_str) * 16
+        except ValueError:
+            return None
+    elif s.endswith("oz"):
+        try:
+            return float(s[:-2])
+        except ValueError:
+            return None
+    else:
+        try:
+            return float(s)
+        except ValueError:
+            return None
+
+
+def _parse_dims(dims_str: str) -> tuple[float, float, float] | None:
+    """Parse a dims string like '4x3x1' (LxWxH in inches). Returns (l, w, h) or None."""
+    parts = dims_str.strip().lower().split("x")
+    if len(parts) != 3:
+        return None
+    try:
+        return float(parts[0]), float(parts[1]), float(parts[2])
+    except ValueError:
+        return None
+
+
 class ShopkeepBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -421,8 +453,8 @@ class ShopkeepBot(discord.Client):
                         transactions=raw.get("transactions", []),
                     )
                     await channel.send(embed=embed)
-                await db.mark_receipt_notified(conn, row["receipt_id"])
-                await conn.commit()
+                    await db.mark_receipt_notified(conn, row["receipt_id"])
+                    await conn.commit()
 
         self._last_polled[guild_id] = int(time.time())
 
@@ -479,6 +511,42 @@ class ShopkeepBot(discord.Client):
         async def revenue(interaction: discord.Interaction, period: str = "this_month"):
             await self._cmd_revenue(interaction, period=period)
 
+        preset_group = discord.app_commands.Group(name="preset", description="Manage shipping presets")
+
+        @preset_group.command(name="add", description="Save a new shipping preset")
+        @discord.app_commands.describe(
+            name="Preset name (e.g. small-jewelry)",
+            carrier="Shipping carrier",
+            mail_class="Mail class or service level (e.g. first_class, priority)",
+            weight="Package weight (e.g. 0.3lb or 4.8oz)",
+            dims="Package dimensions LxWxH in inches (e.g. 4x3x1)",
+        )
+        @discord.app_commands.choices(carrier=[
+            discord.app_commands.Choice(name="USPS", value="USPS"),
+            discord.app_commands.Choice(name="UPS", value="UPS"),
+            discord.app_commands.Choice(name="FedEx", value="FedEx"),
+        ])
+        async def preset_add(
+            interaction: discord.Interaction,
+            name: str,
+            carrier: str,
+            mail_class: str,
+            weight: str,
+            dims: str,
+        ):
+            await self._cmd_preset_add(interaction, name=name, carrier=carrier, mail_class=mail_class, weight=weight, dims=dims)
+
+        @preset_group.command(name="list", description="List all saved shipping presets")
+        async def preset_list(interaction: discord.Interaction):
+            await self._cmd_preset_list(interaction)
+
+        @preset_group.command(name="remove", description="Delete a saved shipping preset")
+        @discord.app_commands.describe(name="Name of the preset to remove")
+        async def preset_remove(interaction: discord.Interaction, name: str):
+            await self._cmd_preset_remove(interaction, name=name)
+
+        tree.add_command(preset_group)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -490,6 +558,9 @@ class ShopkeepBot(discord.Client):
             ("/disconnect", "Unlink your Etsy shop from this server"),
             ("/revenue [period]", "Show revenue summary (today / this week / this month)"),
             ("/listings", "Browse your active Etsy listings"),
+            ("/preset add", "Save a new shipping preset (carrier, mail class, weight, dims)"),
+            ("/preset list", "List all saved shipping presets"),
+            ("/preset remove", "Delete a saved shipping preset"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -738,6 +809,99 @@ class ShopkeepBot(discord.Client):
         embed.add_field(name="Orders", value=str(order_count), inline=True)
         embed.add_field(name="Avg Order Value", value=f"${avg:,.2f} {currency}", inline=True)
         await interaction.followup.send(embed=embed)
+
+    async def _cmd_preset_add(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        carrier: str,
+        mail_class: str,
+        weight: str,
+        dims: str,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        weight_oz = _parse_weight_oz(weight)
+        if weight_oz is None or weight_oz <= 0:
+            await interaction.followup.send(
+                "Invalid weight. Use a format like `0.3lb`, `4.8oz`, or `5` (oz).", ephemeral=True
+            )
+            return
+
+        parsed_dims = _parse_dims(dims)
+        if parsed_dims is None:
+            await interaction.followup.send(
+                "Invalid dimensions. Use `LxWxH` in inches, e.g. `4x3x1`.", ephemeral=True
+            )
+            return
+        length_in, width_in, height_in = parsed_dims
+
+        async with db.get_db() as conn:
+            inserted = await db.add_preset(
+                conn, interaction.guild_id, name, carrier, mail_class,
+                weight_oz, length_in, width_in, height_in,
+            )
+            await conn.commit()
+
+        if not inserted:
+            await interaction.followup.send(
+                f"A preset named **{name}** already exists. Remove it first with `/preset remove`.",
+                ephemeral=True,
+            )
+            return
+
+        weight_lb = weight_oz / 16
+        dims_str = f"{length_in:g}×{width_in:g}×{height_in:g} in"
+        embed = discord.Embed(title="Preset Saved", color=discord.Color.green())
+        embed.add_field(name="Name", value=name, inline=True)
+        embed.add_field(name="Carrier", value=carrier, inline=True)
+        embed.add_field(name="Mail Class", value=mail_class, inline=True)
+        embed.add_field(name="Weight", value=f"{weight_lb:.2f} lb", inline=True)
+        embed.add_field(name="Dimensions", value=dims_str, inline=True)
+        await interaction.followup.send(embed=embed)
+
+    async def _cmd_preset_list(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        async with db.get_db() as conn:
+            presets = await db.list_presets(conn, interaction.guild_id)
+
+        if not presets:
+            await interaction.followup.send(
+                "No presets saved yet. Use `/preset add` to create one.", ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(
+            title="Shipping Presets",
+            description=f"{len(presets)} preset{'s' if len(presets) != 1 else ''}",
+            color=discord.Color.blurple(),
+        )
+        for p in presets:
+            weight_lb = p["weight_oz"] / 16
+            dims_str = f"{p['length_in']:g}×{p['width_in']:g}×{p['height_in']:g} in"
+            embed.add_field(
+                name=p["name"],
+                value=f"{p['carrier']} · {p['mail_class']} · {weight_lb:.2f} lb · {dims_str}",
+                inline=False,
+            )
+        await interaction.followup.send(embed=embed)
+
+    async def _cmd_preset_remove(self, interaction: discord.Interaction, name: str) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        async with db.get_db() as conn:
+            deleted = await db.delete_preset(conn, interaction.guild_id, name)
+            await conn.commit()
+
+        if not deleted:
+            await interaction.followup.send(
+                f"No preset named **{name}** found. Use `/preset list` to see all presets.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(f"Preset **{name}** removed.", ephemeral=True)
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction
