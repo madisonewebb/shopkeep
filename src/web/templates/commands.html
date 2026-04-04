@@ -106,18 +106,38 @@
         </div>
 
         <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Show the Etsy shop connected to this server and which channel is set for order notifications.</p>
+        </div>
+
+        <div class="cmd-card">
           <code class="text-sk-lblue text-sm font-medium block mb-2">/shop</code>
           <p class="text-sm text-sk-muted leading-relaxed">Display information about the Etsy shop connected to this server, including shop name, ID, and connection status.</p>
         </div>
 
         <div class="cmd-card">
-          <code class="text-sk-lblue text-sm font-medium block mb-2">/orders</code>
-          <p class="text-sm text-sk-muted leading-relaxed">List the most recent orders from your connected Etsy shop with receipt IDs, buyer info, and totals.</p>
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/orders [days] [status]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">List orders from your connected Etsy shop. Defaults to the last 30 days, open orders only. Filter by status: open, completed, canceled, or all.</p>
         </div>
 
         <div class="cmd-card">
-          <code class="text-sk-lblue text-sm font-medium block mb-2">/connect</code>
-          <p class="text-sm text-sk-muted leading-relaxed">Request a new Etsy setup link. Shopkeep sends you a private DM with a fresh link to connect or reconnect your Etsy shop. Use this if your original link has expired.</p>
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/revenue [period]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Show a revenue summary for a time period — today, this week, or this month (default).</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/listings</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Browse your active Etsy listings.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/disconnect</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Unlink your Etsy shop from this server.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/help</code>
+          <p class="text-sm text-sk-muted leading-relaxed">List all Shopkeep commands.</p>
         </div>
       </div>
     </div>

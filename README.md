@@ -15,18 +15,6 @@ A multi-tenant Discord bot that posts Etsy order notifications to your server. E
 - Posts order notifications to a configured Discord channel as embeds
 - Persists shop, listing, and order data in SQLite
 
-## Bot commands
-
-| Command | Description |
-|---|---|
-| `/help` | Lists all commands |
-| `/shop` | Shows your shop name, location, total sales, and rating |
-| `/orders` | Lists open orders from the last 30 days with buyer, total, and shipping status |
-| `/status` | Shows connection status and which Etsy shop is linked |
-| `/setchannel` | Sets the current channel as the order notification channel |
-
----
-
 ## How it works
 
 1. Add the bot to your Discord server
