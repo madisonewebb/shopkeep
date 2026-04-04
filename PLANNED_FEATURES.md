@@ -8,6 +8,7 @@ The following are fully functional:
 
 OAuth 2.0 onboarding: Guild owners run /connect; bot DMs a setup link; owner authorizes with Etsy (PKCE flow)
 Order notifications: Bot polls Etsy every 60 seconds and posts a notification for every new order
+Order status change notifications: Posts a green "Order Shipped" embed when an order is marked shipped; posts a red "Order Canceled" embed when an order is canceled
 Welcome message on bot join: DMs the guild owner a setup link and onboarding instructions when the bot joins a new server
 Richer order notification embeds: New order notifications include item titles, a receipt link, and a listing thumbnail
 Connect/disconnect confirmation embeds: Posts a confirmation to the order channel when a shop is linked or unlinked; falls back to a DM to the guild owner if no channel is set
@@ -22,15 +23,6 @@ Connect/disconnect confirmation embeds: Posts a confirmation to the order channe
 
 
 PLANNED FEATURES
-
-1. Order Status Change Notifications
-
-What: Post a follow-up notification when an existing order is marked as shipped or canceled.
-
-Details:
-- When an order is marked shipped, post a green "Order Shipped" notification
-- When an order is canceled, post a red "Order Canceled" notification
-- Requires changing the database upsert logic to detect what changed on each poll
 
 4. Review Notifications
 
@@ -224,18 +216,18 @@ Done:
 - Welcome message on bot join
 - Richer order notification embeds
 - Connect/disconnect confirmation embeds
+- Order status change notifications (shipped = green, canceled = red)
 - /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings
 
 Planned:
-1.  Order status change notifications
-2.  Review notifications
-3.  Repeat customer callout
-4.  Shipping deadline reminders (/reminders)
-5.  Out-of-stock notifications
-6.  Order backlog warning
-7.  Daily digest (/digest)
-8.  Revenue goal tracking (/goal)
-9.  /bestsellers
+1.  Review notifications
+2.  Repeat customer callout
+3.  Shipping deadline reminders (/reminders)
+4.  Out-of-stock notifications
+5.  Order backlog warning
+6.  Daily digest (/digest)
+7.  Revenue goal tracking (/goal)
+8.  /bestsellers
 
 Stretch:
 S1. Shipping presets (/preset)

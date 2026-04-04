@@ -9,7 +9,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shop_embed, build_welcome_embed
+from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -386,10 +386,29 @@ class ShopkeepBot(discord.Client):
 
         async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
+
+            # Snapshot status before upserting so we can detect changes
+            receipt_ids = [r["receipt_id"] for r in receipts]
+            old_snapshot = await db.get_receipts_status_snapshot(conn, receipt_ids)
+
             for receipt in receipts:
                 receipt.setdefault("shop_id", shop_id)
                 await db.upsert_receipt(conn, receipt)
             await conn.commit()
+
+            # Post status change notifications for already-seen receipts
+            if channel:
+                for receipt in receipts:
+                    rid = receipt["receipt_id"]
+                    old = old_snapshot.get(rid)
+                    if old is None:
+                        continue  # New receipt — handled by unnotified flow below
+                    new_shipped = 1 if receipt.get("is_shipped") else 0
+                    new_status = receipt.get("status", "")
+                    if not old["is_shipped"] and new_shipped:
+                        await channel.send(embed=build_status_change_embed(receipt, shop_name, "shipped"))
+                    elif old["status"] != "canceled" and new_status == "canceled":
+                        await channel.send(embed=build_status_change_embed(receipt, shop_name, "canceled"))
 
             unnotified = await db.get_unnotified_receipts(conn, shop_id)
             for row in unnotified:

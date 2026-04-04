@@ -110,6 +110,60 @@ def build_disconnect_embed(shop_name: str) -> discord.Embed:
     return embed
 
 
+def build_status_change_embed(
+    receipt: dict,
+    shop_name: str,
+    change_type: str,
+) -> discord.Embed:
+    """
+    Build a Discord embed for an order status change notification.
+
+    Args:
+        receipt: Raw API receipt dict (snake_case).
+        shop_name: Human-readable shop name shown in the footer.
+        change_type: "shipped" or "canceled".
+    """
+    receipt_id = receipt.get("receipt_id", "?")
+    buyer = receipt.get("name") or "Unknown"
+    grandtotal = receipt.get("grandtotal", {})
+    amount = grandtotal.get("amount", 0)
+    divisor = grandtotal.get("divisor") or 100
+    currency = grandtotal.get("currency_code", "USD")
+    total = f"${amount / divisor:.2f} {currency}"
+    receipt_url = f"https://www.etsy.com/your_account/orders/{receipt_id}"
+
+    if change_type == "shipped":
+        title = f"Order #{receipt_id} Shipped"
+        color = discord.Color.green()
+    else:
+        title = f"Order #{receipt_id} Canceled"
+        color = discord.Color.red()
+
+    embed = discord.Embed(
+        title=title,
+        url=receipt_url,
+        description=f"**{buyer}** — {total}",
+        color=color,
+    )
+
+    transactions = receipt.get("transactions", [])
+    if transactions:
+        titles = [t["title"] for t in transactions if t.get("title")]
+        if titles:
+            embed.add_field(name="Items", value="\n".join(f"• {t}" for t in titles), inline=False)
+        first_image = transactions[0].get("listing_image") or {}
+        thumbnail_url = first_image.get("url_75x75") or first_image.get("url_170x135")
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
+
+    create_timestamp = receipt.get("create_timestamp")
+    if create_timestamp:
+        embed.timestamp = datetime.fromtimestamp(create_timestamp, tz=timezone.utc)
+
+    embed.set_footer(text=shop_name)
+    return embed
+
+
 def build_order_embed(
     receipt: dict,
     shop_name: str,
