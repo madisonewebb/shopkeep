@@ -16,7 +16,7 @@ def test_shop_embed_vacation_field():
     assert any(f.name == "Status" and f.value == "On Vacation" for f in embed.fields)
 
 
-def test_order_embed_new_prefix():
+def test_order_embed_new_title():
     receipt = {
         "receipt_id": 1,
         "status": "open",
@@ -25,7 +25,9 @@ def test_order_embed_new_prefix():
         "grandtotal_currency": "USD",
     }
     embed = build_order_embed(receipt, "My Shop", new=True)
-    assert embed.title == "New Order #1"
+    assert embed.title == "🎉 New Sale!"
+    assert embed.colour == discord.Color.gold()
+    assert "#1" in embed.description
 
 
 def test_order_embed_canceled_is_red():
@@ -55,8 +57,11 @@ def test_order_embed_total_calculation():
 
 def test_order_embed_receipt_url():
     receipt = {"receipt_id": 42, "status": "open", "grandtotal_amount": 0, "grandtotal_divisor": 100, "grandtotal_currency": "USD"}
+    # non-new embeds link via embed.url; new embeds embed the link in the description
     embed = build_order_embed(receipt, "My Shop")
     assert embed.url == "https://www.etsy.com/your_account/orders/42"
+    new_embed = build_order_embed(receipt, "My Shop", new=True)
+    assert "https://www.etsy.com/your_account/orders/42" in new_embed.description
 
 
 def test_order_embed_items_field():
