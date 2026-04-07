@@ -187,6 +187,8 @@ def build_order_embed(
 
     if status.lower() == "canceled":
         color = discord.Color.red()
+    elif new:
+        color = discord.Color.gold()
     elif is_paid and not is_shipped:
         color = discord.Color.orange()
     else:
@@ -198,19 +200,45 @@ def build_order_embed(
     total = f"${amount / divisor:.2f} {currency}"
     buyer = receipt.get("name") or "Unknown"
 
+    city = receipt.get("city")
+    country = receipt.get("country_iso")
+    location = ", ".join(filter(None, [city, country])) if (city or country) else None
+
     receipt_url = f"https://www.etsy.com/your_account/orders/{receipt_id}"
-    title = f"{'New Order' if new else 'Order'} #{receipt_id}"
+    if new:
+        title = "🎉 New Sale!"
+        buyer_line = f"**{buyer}** ordered [#{receipt_id}]({receipt_url}) — **{total}**"
+        description = f"{buyer_line}\n📍 {location}" if location else buyer_line
+    else:
+        title = f"Order #{receipt_id}"
+        description = f"**{buyer}** — {total}"
+
     embed = discord.Embed(
         title=title,
-        url=receipt_url,
-        description=f"**{buyer}** — {total}",
+        url=receipt_url if not new else None,
+        description=description,
         color=color,
     )
 
     if transactions:
-        titles = [t["title"] for t in transactions if t.get("title")]
-        if titles:
-            embed.add_field(name="Items", value="\n".join(f"• {t}" for t in titles), inline=False)
+        item_lines = []
+        for t in transactions:
+            if not t.get("title"):
+                continue
+            qty = t.get("quantity", 1)
+            line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
+            variations = t.get("selected_variations") or []
+            if variations:
+                var_str = ", ".join(
+                    f"{v['formatted_name']}: {v['formatted_value']}"
+                    for v in variations
+                    if v.get("formatted_name") and v.get("formatted_value")
+                )
+                if var_str:
+                    line += f"\n  *{var_str}*"
+            item_lines.append(line)
+        if item_lines:
+            embed.add_field(name="Items", value="\n".join(item_lines), inline=False)
 
         first_image = transactions[0].get("listing_image") or {}
         thumbnail_url = first_image.get("url_75x75") or first_image.get("url_170x135")
