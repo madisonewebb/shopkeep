@@ -105,7 +105,11 @@ class EtsyClient:
         was_paid: Optional[bool] = None,
         was_shipped: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        params: Dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+            "includes": ["Transactions"],
+        }
         if min_created is not None:
             params["min_created"] = min_created
         if max_created is not None:
@@ -123,5 +127,5 @@ class EtsyClient:
         offset: int = 0,
         state: str = "active",
     ) -> Dict[str, Any]:
-        params = {"limit": limit, "offset": offset, "state": state}
+        params = {"limit": limit, "offset": offset, "state": state, "includes": ["MainImage"]}
         return self._request("GET", f"/application/shops/{shop_id}/listings", params=params)
