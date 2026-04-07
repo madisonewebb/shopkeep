@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS listings (
     when_made               TEXT,
     creation_timestamp      INTEGER,
     last_modified_timestamp INTEGER,
+    image_url               TEXT,
     fetched_at              INTEGER NOT NULL
 )
 """
@@ -157,6 +158,10 @@ async def init_db() -> None:
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
         await db.execute(_CREATE_SHIPPING_PRESETS)
+        try:
+            await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
+        except Exception:
+            pass  # column already exists
         await db.commit()
 
 
@@ -349,8 +354,8 @@ async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
             url, num_favorers, is_customizable, is_personalizable, listing_type,
             tags, materials, price_amount, price_divisor, price_currency_code,
             views, is_digital, who_made, when_made, creation_timestamp,
-            last_modified_timestamp, fetched_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            last_modified_timestamp, image_url, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             listing["listing_id"],
@@ -376,6 +381,8 @@ async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
             listing.get("when_made"),
             listing.get("creation_timestamp"),
             listing.get("last_modified_timestamp"),
+            (listing.get("main_image") or {}).get("url_570xN")
+            or (listing.get("main_image") or {}).get("url_170x135"),
             int(time.time()),
         ),
     )
