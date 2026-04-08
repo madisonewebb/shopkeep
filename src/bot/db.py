@@ -140,8 +140,18 @@ CREATE TABLE IF NOT EXISTS receipts (
     discount_amount       INTEGER DEFAULT 0,
     create_timestamp      INTEGER NOT NULL,
     update_timestamp      INTEGER,
+    expected_ship_date    INTEGER,
     fetched_at            INTEGER NOT NULL,
     notified_at           INTEGER
+)
+"""
+
+_CREATE_SHIPPING_REMINDERS = """
+CREATE TABLE IF NOT EXISTS shipping_reminders (
+    receipt_id  INTEGER NOT NULL REFERENCES receipts(receipt_id),
+    days_before INTEGER NOT NULL,
+    sent_at     INTEGER NOT NULL,
+    PRIMARY KEY (receipt_id, days_before)
 )
 """
 
@@ -158,8 +168,17 @@ async def init_db() -> None:
         await db.execute(_CREATE_LISTINGS)
         await db.execute(_CREATE_RECEIPTS)
         await db.execute(_CREATE_SHIPPING_PRESETS)
+        await db.execute(_CREATE_SHIPPING_REMINDERS)
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE receipts ADD COLUMN expected_ship_date INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_days TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -406,6 +425,7 @@ async def upsert_receipt(
     tax = receipt.get("total_tax_cost", {})
     discount = receipt.get("discount_amt", {})
     notified_at = int(time.time()) if already_seen else None
+    expected_ship_date = receipt.get("expected_ship_date")
 
     cursor = await db.execute(
         """
@@ -415,9 +435,9 @@ async def upsert_receipt(
             payment_method, is_paid, is_shipped, is_gift, gift_message,
             grandtotal_amount, grandtotal_divisor, grandtotal_currency,
             subtotal_amount, total_shipping_amount, total_tax_amount,
-            discount_amount, create_timestamp, update_timestamp, fetched_at,
-            notified_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            discount_amount, create_timestamp, update_timestamp, expected_ship_date,
+            fetched_at, notified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             receipt["receipt_id"],
@@ -446,6 +466,7 @@ async def upsert_receipt(
             discount.get("amount", 0),
             receipt.get("create_timestamp", int(time.time())),
             receipt.get("update_timestamp"),
+            expected_ship_date,
             int(time.time()),
             notified_at,
         ),
@@ -457,13 +478,15 @@ async def upsert_receipt(
         await db.execute(
             """
             UPDATE receipts
-            SET is_shipped = ?, status = ?, update_timestamp = ?, fetched_at = ?
+            SET is_shipped = ?, status = ?, update_timestamp = ?,
+                expected_ship_date = ?, fetched_at = ?
             WHERE receipt_id = ?
             """,
             (
                 1 if receipt.get("is_shipped") else 0,
                 receipt.get("status", ""),
                 receipt.get("update_timestamp"),
+                expected_ship_date,
                 int(time.time()),
                 receipt["receipt_id"],
             ),
@@ -503,6 +526,87 @@ async def mark_receipt_notified(db: aiosqlite.Connection, receipt_id: int) -> No
     await db.execute(
         "UPDATE receipts SET notified_at = ? WHERE receipt_id = ?",
         (int(time.time()), receipt_id),
+    )
+
+
+# ── Shipping reminder helpers ─────────────────────────────────────────────────
+
+
+async def get_pending_reminders(
+    db: aiosqlite.Connection,
+    shop_id: int,
+    days_before: int,
+    now: int,
+) -> list:
+    """Return unshipped receipts due within days_before days that haven't had this reminder sent."""
+    deadline = now + days_before * 86400
+    cursor = await db.execute(
+        """
+        SELECT r.*
+        FROM receipts r
+        WHERE r.shop_id = ?
+          AND r.is_shipped = 0
+          AND r.expected_ship_date IS NOT NULL
+          AND r.expected_ship_date <= ?
+          AND NOT EXISTS (
+              SELECT 1 FROM shipping_reminders sr
+              WHERE sr.receipt_id = r.receipt_id
+                AND sr.days_before = ?
+          )
+        ORDER BY r.expected_ship_date ASC
+        """,
+        (shop_id, deadline, days_before),
+    )
+    return await cursor.fetchall()
+
+
+async def mark_reminder_sent(
+    db: aiosqlite.Connection,
+    receipt_id: int,
+    days_before: int,
+) -> None:
+    await db.execute(
+        """
+        INSERT OR IGNORE INTO shipping_reminders (receipt_id, days_before, sent_at)
+        VALUES (?, ?, ?)
+        """,
+        (receipt_id, days_before, int(time.time())),
+    )
+
+
+async def get_guild_reminder_days(
+    db: aiosqlite.Connection,
+    guild_id: int,
+) -> list[int] | None:
+    """Return configured reminder thresholds for a guild, or None if not set."""
+    cursor = await db.execute(
+        "SELECT ship_reminder_days FROM guilds WHERE guild_id = ?",
+        (guild_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return json.loads(row[0])
+
+
+async def set_guild_reminder_days(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    days: list[int],
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET ship_reminder_days = ? WHERE guild_id = ?",
+        (json.dumps(days), guild_id),
+    )
+
+
+async def disable_guild_reminders(
+    db: aiosqlite.Connection,
+    guild_id: int,
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET ship_reminder_days = NULL WHERE guild_id = ?",
+        (guild_id,),
     )
 
 

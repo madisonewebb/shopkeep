@@ -9,7 +9,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -456,7 +456,30 @@ class ShopkeepBot(discord.Client):
                     await db.mark_receipt_notified(conn, row["receipt_id"])
                     await conn.commit()
 
+            await self._check_shipping_reminders(conn, guild_id, shop_id, channel, shop_name)
+
         self._last_polled[guild_id] = int(time.time())
+
+    async def _check_shipping_reminders(
+        self,
+        conn,
+        guild_id: int,
+        shop_id: int,
+        channel,
+        shop_name: str,
+    ) -> None:
+        """Post shipping deadline reminders for open orders approaching their ship date."""
+        reminder_days = await db.get_guild_reminder_days(conn, guild_id)
+        if not reminder_days or channel is None:
+            return
+        now = int(time.time())
+        for days_before in reminder_days:
+            pending = await db.get_pending_reminders(conn, shop_id, days_before, now)
+            for row in pending:
+                embed = build_shipping_reminder_embed(dict(row), shop_name, days_before)
+                await channel.send(embed=embed)
+                await db.mark_reminder_sent(conn, row["receipt_id"], days_before)
+                await conn.commit()
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
@@ -547,6 +570,30 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(preset_group)
 
+        reminders_group = discord.app_commands.Group(
+            name="reminders",
+            description="Configure shipping deadline reminders",
+        )
+
+        @reminders_group.command(
+            name="set",
+            description="Enable shipping reminders for specific day thresholds",
+        )
+        @discord.app_commands.describe(
+            days='Day thresholds as comma-separated integers: 0=today, 1=tomorrow, 2=in 2 days (e.g. "0,1,2")',
+        )
+        async def reminders_set(interaction: discord.Interaction, days: str):
+            await self._cmd_reminders_set(interaction, days=days)
+
+        @reminders_group.command(
+            name="disable",
+            description="Disable all shipping deadline reminders for this server",
+        )
+        async def reminders_disable(interaction: discord.Interaction):
+            await self._cmd_reminders_disable(interaction)
+
+        tree.add_command(reminders_group)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -561,6 +608,8 @@ class ShopkeepBot(discord.Client):
             ("/preset add", "Save a new shipping preset (carrier, mail class, weight, dims)"),
             ("/preset list", "List all saved shipping presets"),
             ("/preset remove", "Delete a saved shipping preset"),
+            ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
+            ("/reminders disable", "Disable all shipping deadline reminders"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -902,6 +951,65 @@ class ShopkeepBot(discord.Client):
             return
 
         await interaction.followup.send(f"Preset **{name}** removed.", ephemeral=True)
+
+    async def _cmd_reminders_set(self, interaction: discord.Interaction, days: str) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        parsed = []
+        for part in days.split(","):
+            part = part.strip()
+            if not part.isdigit():
+                await interaction.response.send_message(
+                    f'Invalid value `{part}`. Use integers only, e.g. `"0,1,2"`.', ephemeral=True
+                )
+                return
+            val = int(part)
+            if val < 0 or val > 7:
+                await interaction.response.send_message(
+                    f"Day value `{val}` is out of range. Use values between 0 and 7.", ephemeral=True
+                )
+                return
+            parsed.append(val)
+
+        parsed = sorted(set(parsed))
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                await interaction.response.send_message(
+                    "No Etsy shop connected. Connect a shop first.", ephemeral=True
+                )
+                return
+            await db.set_guild_reminder_days(conn, interaction.guild_id, parsed)
+            await conn.commit()
+
+        threshold_labels = {0: "Today", 1: "Tomorrow"}
+        labels = [threshold_labels.get(d, f"{d} days out") for d in parsed]
+        embed = discord.Embed(
+            title="Shipping Reminders Configured",
+            description=f"You'll be notified when unshipped orders are due: **{', '.join(labels)}**.",
+            color=discord.Color.green(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _cmd_reminders_disable(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.disable_guild_reminders(conn, interaction.guild_id)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            "Shipping deadline reminders have been disabled.", ephemeral=True
+        )
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction

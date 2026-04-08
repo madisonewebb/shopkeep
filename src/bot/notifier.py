@@ -262,3 +262,60 @@ def build_order_embed(
     embed.set_footer(text=shop_name)
 
     return embed
+
+
+def build_shipping_reminder_embed(
+    receipt: dict,
+    shop_name: str,
+    days_before: int,
+) -> discord.Embed:
+    """
+    Build a Discord embed for a shipping deadline reminder.
+
+    Args:
+        receipt: A dict of receipt DB columns (snake_case).
+        shop_name: Human-readable shop name shown in the footer.
+        days_before: Days until expected ship date (0=today, 1=tomorrow, etc.).
+    """
+    receipt_id = receipt.get("receipt_id", "?")
+    buyer = receipt.get("name") or "Unknown"
+    amount = receipt.get("grandtotal_amount", 0)
+    divisor = receipt.get("grandtotal_divisor") or 100
+    currency = receipt.get("grandtotal_currency", "USD")
+    total = f"${amount / divisor:.2f} {currency}"
+    receipt_url = f"https://www.etsy.com/your_account/orders/{receipt_id}"
+
+    if days_before == 0:
+        urgency = "Ship Today"
+        color = discord.Color.red()
+        deadline_line = "This order is due to ship **today**."
+    elif days_before == 1:
+        urgency = "Ship Tomorrow"
+        color = discord.Color.orange()
+        deadline_line = "This order is due to ship **tomorrow**."
+    else:
+        urgency = f"Ship in {days_before} Days"
+        color = discord.Color.yellow()
+        deadline_line = f"This order is due to ship in **{days_before} days**."
+
+    embed = discord.Embed(
+        title=f"Shipping Reminder — {urgency}",
+        url=receipt_url,
+        description=f"**{buyer}** — Order [#{receipt_id}]({receipt_url}) — {total}\n{deadline_line}",
+        color=color,
+    )
+
+    expected_ship_date = receipt.get("expected_ship_date")
+    if expected_ship_date:
+        embed.add_field(
+            name="Expected Ship Date",
+            value=f"<t:{expected_ship_date}:D>",
+            inline=True,
+        )
+
+    create_timestamp = receipt.get("create_timestamp")
+    if create_timestamp:
+        embed.timestamp = datetime.fromtimestamp(create_timestamp, tz=timezone.utc)
+
+    embed.set_footer(text=shop_name)
+    return embed
