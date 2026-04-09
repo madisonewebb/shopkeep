@@ -312,6 +312,10 @@ class ShopkeepBot(discord.Client):
             except discord.Forbidden:
                 pass  # Owner has DMs disabled
 
+    async def on_guild_remove(self, guild: discord.Guild) -> None:
+        self.etsy_clients.pop(guild.id, None)
+        print(f"[guild_remove] Removed from '{guild.name}' ({guild.id}), client cleared")
+
     # ── Bootstrap ─────────────────────────────────────────────────────────────
 
     async def _bootstrap_guild(self, guild_id: int, shop_id: int) -> str:
@@ -386,10 +390,13 @@ class ShopkeepBot(discord.Client):
                 except Exception as exc:
                     print(f"[poller] bootstrap guild={guild_id} {exc}")
 
-        await asyncio.gather(*(
-            self._safe_poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
-            for row in guild_rows
-        ))
+        await asyncio.gather(
+            *(
+                self._safe_poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
+                for row in guild_rows
+            ),
+            return_exceptions=True,
+        )
 
     async def _safe_poll_guild(self, guild_id: int, shop_id: int, channel_id: int) -> None:
         try:

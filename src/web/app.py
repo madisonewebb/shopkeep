@@ -77,13 +77,13 @@ def connect(setup_token: str):
     guild = webdb.get_guild_by_setup_token(setup_token)
 
     if not guild:
-        return render_template("error.html", message="This setup link is invalid.")
+        return render_template("error.html", message="This setup link is invalid."), 404
 
     if guild["setup_token_exp"] and guild["setup_token_exp"] < time.time():
-        return render_template("error.html", message="This setup link has expired. Use !status in Discord to get a new one.")
+        return render_template("error.html", message="This setup link has expired. Use !status in Discord to get a new one."), 410
 
     if guild["etsy_shop_id"]:
-        return render_template("error.html", message="This server already has an Etsy shop connected.")
+        return render_template("error.html", message="This server already has an Etsy shop connected."), 409
 
     if request.method == "POST":
         code_verifier, code_challenge = _make_pkce_pair()
@@ -113,11 +113,11 @@ def etsy_callback():
     error = request.args.get("error")
 
     if error:
-        return render_template("error.html", message=f"Etsy authorization denied: {error}")
+        return render_template("error.html", message=f"Etsy authorization denied: {error}"), 403
 
     pkce = webdb.get_pkce_state(state) if state else None
     if not code or not pkce:
-        return render_template("error.html", message="Invalid OAuth callback. Please try again.")
+        return render_template("error.html", message="Invalid OAuth callback. Please try again."), 400
 
     webdb.delete_pkce_state(state)
 
@@ -131,9 +131,10 @@ def etsy_callback():
             "code": code,
             "code_verifier": pkce["code_verifier"],
         },
+        timeout=10,
     )
     if not resp.ok:
-        return render_template("error.html", message="Token exchange failed. Please try again.")
+        return render_template("error.html", message="Token exchange failed. Please try again."), 502
 
     tokens = resp.json()
     access_token = tokens["access_token"]
@@ -143,7 +144,7 @@ def etsy_callback():
     # Look up the authenticated user's own shop — verifies ownership
     user_id = _user_id_from_token(access_token)
     if not user_id:
-        return render_template("error.html", message="Could not determine your Etsy user ID. Please try again.")
+        return render_template("error.html", message="Could not determine your Etsy user ID. Please try again."), 400
 
     shop_resp = requests.get(
         f"{ETSY_API_BASE}/application/users/{user_id}/shops",
@@ -151,14 +152,15 @@ def etsy_callback():
             "x-api-key": f"{ETSY_API_KEY}:{ETSY_SHARED_SECRET}",
             "Authorization": f"Bearer {access_token}",
         },
+        timeout=10,
     )
     if not shop_resp.ok:
-        return render_template("error.html", message="Could not retrieve your Etsy shop. Make sure your account has an active shop.")
+        return render_template("error.html", message="Could not retrieve your Etsy shop. Make sure your account has an active shop."), 502
 
     data = shop_resp.json()
     results = data.get("results") or ([data] if data.get("shop_id") else [])
     if not results:
-        return render_template("error.html", message="No Etsy shop found on your account.")
+        return render_template("error.html", message="No Etsy shop found on your account."), 400
 
     shop = results[0]
     shop_id = shop["shop_id"]

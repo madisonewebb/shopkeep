@@ -171,16 +171,25 @@ async def init_db() -> None:
         await db.execute(_CREATE_SHIPPING_REMINDERS)
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
-        except Exception:
+        except aiosqlite.OperationalError:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE receipts ADD COLUMN expected_ship_date INTEGER")
-        except Exception:
+        except aiosqlite.OperationalError:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_days TEXT")
-        except Exception:
+        except aiosqlite.OperationalError:
             pass  # column already exists
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_receipts_shop ON receipts(shop_id)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_receipts_unnotified ON receipts(shop_id, notified_at)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_receipts_reminders ON receipts(shop_id, is_shipped, expected_ship_date)"
+        )
         await db.commit()
 
 
@@ -190,6 +199,7 @@ async def get_db():
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("PRAGMA journal_mode=WAL")
         await conn.execute("PRAGMA foreign_keys=ON")
+        await conn.execute("PRAGMA busy_timeout=5000")
         conn.row_factory = aiosqlite.Row
         yield conn
 
