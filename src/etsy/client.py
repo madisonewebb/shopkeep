@@ -139,5 +139,5 @@ class EtsyClient:
         offset: int = 0,
         state: str = "active",
     ) -> Dict[str, Any]:
-        params = {"limit": limit, "offset": offset, "state": state, "includes": ["MainImage"]}
+        params = {"limit": limit, "offset": offset, "state": state, "includes": ["Images"]}
         return self._request("GET", f"/application/shops/{shop_id}/listings", params=params)
