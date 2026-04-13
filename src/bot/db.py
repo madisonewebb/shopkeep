@@ -418,8 +418,8 @@ async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
             listing.get("when_made"),
             listing.get("creation_timestamp"),
             listing.get("last_modified_timestamp"),
-            (listing.get("main_image") or {}).get("url_570xN")
-            or (listing.get("main_image") or {}).get("url_170x135"),
+            ((listing.get("images") or [{}])[0]).get("url_570xN")
+            or ((listing.get("images") or [{}])[0]).get("url_170x135"),
             int(time.time()),
         ),
     )
