@@ -264,6 +264,35 @@ def build_order_embed(
     return embed
 
 
+def build_review_embed(review: dict, shop_name: str) -> discord.Embed:
+    """
+    Build a Discord embed for a new shop review notification.
+
+    Args:
+        review: A dict of review DB columns (snake_case).
+        shop_name: Human-readable shop name shown in the footer.
+    """
+    rating = review.get("rating", 0)
+    stars = "⭐" * rating + f" ({rating}/5)"
+    review_text = review.get("review", "").strip()
+
+    embed = discord.Embed(
+        title=f"New Review: {stars}",
+        description=f'"{review_text}"' if review_text else None,
+        color=discord.Color.gold(),
+    )
+
+    if image_url := review.get("image_url"):
+        embed.set_thumbnail(url=image_url)
+
+    create_timestamp = review.get("create_timestamp")
+    if create_timestamp:
+        embed.timestamp = datetime.fromtimestamp(create_timestamp, tz=timezone.utc)
+
+    embed.set_footer(text=shop_name)
+    return embed
+
+
 def build_shipping_reminder_embed(
     receipt: dict,
     shop_name: str,

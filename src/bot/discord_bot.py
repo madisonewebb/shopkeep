@@ -9,7 +9,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -329,9 +329,13 @@ class ShopkeepBot(discord.Client):
         receipts_resp = await loop.run_in_executor(
             None, lambda: etsy.get_shop_receipts(shop_id, limit=100)
         )
+        reviews_resp = await loop.run_in_executor(
+            None, lambda: etsy.get_shop_reviews(shop_id, limit=100)
+        )
 
         listings = listings_resp.get("results", [])
         receipts = receipts_resp.get("results", [])
+        reviews = reviews_resp.get("results", [])
 
         async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
@@ -339,12 +343,16 @@ class ShopkeepBot(discord.Client):
             for receipt in receipts:
                 receipt.setdefault("shop_id", shop_id)
                 await db.upsert_receipt(conn, receipt, already_seen=True)
+            for review in reviews:
+                review["shop_id"] = shop_id
+                await db.upsert_review(conn, review, already_seen=True)
             await conn.commit()
 
         shop_name = shop_data.get("shop_name", "")
         print(
             f"[bootstrap] Done — '{shop_name}', "
-            f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen."
+            f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen, "
+            f"{len(reviews)} existing review(s) marked seen."
         )
         return shop_name
 
@@ -457,6 +465,7 @@ class ShopkeepBot(discord.Client):
                     await conn.commit()
 
             await self._check_shipping_reminders(conn, guild_id, shop_id, channel, shop_name)
+            await self._check_new_reviews(conn, guild_id, shop_id, channel, shop_name)
 
         self._last_polled[guild_id] = int(time.time())
 
@@ -480,6 +489,39 @@ class ShopkeepBot(discord.Client):
                 await channel.send(embed=embed)
                 await db.mark_reminder_sent(conn, row["receipt_id"], days_before)
                 await conn.commit()
+
+    async def _check_new_reviews(
+        self,
+        conn,
+        guild_id: int,
+        shop_id: int,
+        channel,
+        shop_name: str,
+    ) -> None:
+        """Fetch recent reviews, store any new ones, and post notifications."""
+        etsy = self.etsy_clients.get(guild_id)
+        if not etsy or channel is None:
+            return
+        loop = asyncio.get_running_loop()
+        try:
+            response = await loop.run_in_executor(
+                None, lambda: etsy.get_shop_reviews(shop_id, limit=25)
+            )
+        except Exception as exc:
+            print(f"[poller] reviews guild={guild_id} {exc}")
+            return
+        reviews = response.get("results", [])
+        for review in reviews:
+            review["shop_id"] = shop_id
+            await db.upsert_review(conn, review)
+        await conn.commit()
+
+        unnotified = await db.get_unnotified_reviews(conn, shop_id)
+        for row in unnotified:
+            embed = build_review_embed(dict(row), shop_name=shop_name)
+            await channel.send(embed=embed)
+            await db.mark_review_notified(conn, row["transaction_id"])
+            await conn.commit()
 
     # ── Commands ──────────────────────────────────────────────────────────────
 

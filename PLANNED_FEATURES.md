@@ -2,15 +2,15 @@
 Shopkeep - Planned Features
 
 
-WHAT'S ALREADY BUILT (updated 4/2/26)
+WHAT'S ALREADY BUILT (updated 4/13/26)
 
 The following are fully functional:
 
 OAuth 2.0 onboarding: Guild owners run /connect; bot DMs a setup link; owner authorizes with Etsy (PKCE flow)
 Order notifications: Bot polls Etsy every 60 seconds and posts a notification for every new order
+Celebratory new sale embed: New order notifications show a 🎉 "New Sale!" title in gold with buyer name, order total, buyer location (city + country), item list with variations, and listing thumbnail
 Order status change notifications: Posts a green "Order Shipped" embed when an order is marked shipped; posts a red "Order Canceled" embed when an order is canceled
 Welcome message on bot join: DMs the guild owner a setup link and onboarding instructions when the bot joins a new server
-Richer order notification embeds: New order notifications include item titles, a receipt link, and a listing thumbnail
 Connect/disconnect confirmation embeds: Posts a confirmation to the order channel when a shop is linked or unlinked; falls back to a DM to the guild owner if no channel is set
 /help - Lists all available commands
 /status - Shows the connected Etsy shop and the configured notification channel
@@ -20,26 +20,14 @@ Connect/disconnect confirmation embeds: Posts a confirmation to the order channe
 /disconnect - Unlinks the Etsy shop from the server; clears OAuth tokens and stops notifications (requires Manage Server)
 /revenue [period] - Revenue summary for today, this week, or this month; shows total revenue, order count, and average order value
 /listings - Paginated browse of active Etsy listings; shows title, price, and quantity in stock (5 per page)
+/reminders - Configurable shipping deadline reminders; on by default with 1-day notice; supports multiple thresholds (e.g. /reminders set 1 2); disable with /reminders off
+/preset - Save reusable shipping package configurations (weight, dimensions, carrier, mail class) per server; supports add, list, and remove subcommands
+Review notifications: Posts a notification when a new review is left; shows star rating and review text; existing reviews are marked seen on connect to avoid spam
 
 
 PLANNED FEATURES
 
-4. Review Notifications
-
-What: Post a notification whenever a new review is left on the shop.
-
-Details:
-- Polls for new reviews alongside receipts each cycle
-- Stores seen review IDs to avoid duplicate notifications
-- Notification shows star rating, reviewer name, and review snippet
-
-Example:
-    New Review: 5 stars
-    "Absolutely love my order! Shipped fast and beautifully packaged."
-    - HappyBuyer42
-
-
-5. Repeat Customer Callout
+3. Repeat Customer Callout
 
 What: When a new order comes in from a buyer who has ordered before, flag them as a returning customer in the n
 
@@ -49,28 +37,7 @@ Details:
 - No extra API calls;  works entirely from data already stored locally
 
 
-6. Shipping Deadline Reminders (/reminders)
-
-What: Post a reminder when an open order is approaching its expected ship date, with a configurable advance not
-
-Details:
-- Each Etsy receipt includes an expected ship date; the bot checks open orders against the current date each cy
-- On by default with a 1-day notice — no setup required after connecting
-- Per-order tracking prevents the same reminder from firing twice
-
-Configuration:
-    /reminders                 # show current settings
-    /reminders set 1        # notify 1 day before ship date (default)
-    /reminders set 1 2     # notify at both 2 days and 1 day before
-    /reminders off            # disable shipping reminders
-
-Example:
-    Ship by Tomorrow: Order #12345
-    Buyer: Jane Smith - $34.00
-    Expected ship date: March 27, 2026
-
-
-7. Out-of-Stock Notifications
+4. Out-of-Stock Notifications
 
 What: Post a notification when a listing's quantity drops to zero.
 
@@ -84,7 +51,7 @@ Example:
     Your listing has sold out. Visit Etsy to restock or deactivate it.
 
 
-8. Order Backlog Warning
+5. Order Backlog Warning
 
 What: Post a warning when the number of open, unshipped orders exceeds a configurable threshold.
 
@@ -93,7 +60,7 @@ Details:
 - Default threshold: 5 open orders; configurable per server
 - Warning fires once when the threshold is crossed, not on every poll, to avoid spam
 
-9. Daily Digest (/digest)
+6. Daily Digest (/digest)
 
 What: Every morning at a configured time, the bot automatically posts a summary to the notification channel — n
 
@@ -109,7 +76,7 @@ Configuration:
     /digest off                 # disable
 
 
-10. Revenue Goal Tracking (/goal)
+7. Revenue Goal Tracking (/goal)
 
 What: Set a monthly revenue target and receive milestone notifications as progress is made.
 
@@ -128,7 +95,7 @@ Example:
     You've made $250.00 of your $500.00 March goal with 18 days to go.
 
 
-11. /bestsellers - Top Listings by Sales
+8. /bestsellers - Top Listings by Sales
 
 What: Show the shop's top-performing listings by units sold or revenue over a time period.
 
@@ -144,22 +111,7 @@ Example:
 
 STRETCH GOALS
 
-S1. Shipping Presets (/preset)
-
-What: Allow shop owners to save reusable package configurations (weight, dimensions, carrier) so that printing
-
-Details:
-- Presets are stored per server in the database
-- Each preset has a name, weight, dimensions, carrier, and mail class
-- Used as the foundation for the label printing feature below
-
-Configuration:
-    /preset add "small-jewelry" carrier:USPS class:first_class weight:0.3lb dims:4x3x1
-    /preset list
-    /preset remove "small-jewelry"
-
-
-S2. Shipping Label Printing (/printlabel)
+S1. Shipping Label Printing (/printlabel)
 
 What: Create a shipping label for an order directly from Discord using a saved preset.
 
@@ -167,7 +119,7 @@ Details:
 - Uses the Etsy API's shipping label endpoint
 - Owner selects an open order and a saved preset; the bot submits the label creation request
 - Etsy returns a label PDF URL which is posted back as a Discord message
-- Requires shipping presets (S1) — entering dimensions manually per label would be too cumbersome
+- Requires shipping presets (/preset) — entering dimensions manually per label would be too cumbersome
 
 Example:
     /printlabel order:12345 preset:small-jewelry
@@ -176,7 +128,7 @@ Example:
 Why it's a stretch goal: Label creation involves payment (charged to the Etsy account) and the shipping label A
 
 
-S3. Etsy Conversations + Busy Hours (/busyhours)
+S2. Etsy Conversations + Busy Hours (/busyhours)
 
 What: Surface incoming buyer messages from Etsy into Discord, allow the owner to reply from Discord, and automatically send a customizable away message to buyers who write in during configured busy hours.
 
@@ -214,24 +166,23 @@ SUMMARY
 Done:
 - OAuth onboarding + polling
 - Welcome message on bot join
-- Richer order notification embeds
+- Celebratory new sale embeds (buyer location, item variations, thumbnail)
 - Connect/disconnect confirmation embeds
 - Order status change notifications (shipped = green, canceled = red)
-- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings
+- Shipping deadline reminders (/reminders)
+- Review notifications (star rating, quoted review text, bootstrap deduplication)
+- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset
 
 Planned:
-1.  Review notifications
-2.  Repeat customer callout
-3.  Shipping deadline reminders (/reminders)
-4.  Out-of-stock notifications
-5.  Order backlog warning
-6.  Daily digest (/digest)
-7.  Revenue goal tracking (/goal)
-8.  /bestsellers
+1.  Repeat customer callout
+2.  Out-of-stock notifications
+3.  Order backlog warning
+4.  Daily digest (/digest)
+5.  Revenue goal tracking (/goal)
+6.  /bestsellers
 
 Stretch:
-S1. Shipping presets (/preset)
-S2. Shipping label printing (/printlabel)
-S3. Etsy Conversations + busy hours (/busyhours)
+S1. Shipping label printing (/printlabel)
+S2. Etsy Conversations + busy hours (/busyhours)
 
 

@@ -5,7 +5,7 @@ import time
 import pytest
 
 import src.bot.db as botdb
-from src.bot.db import create_guild, get_guild, get_unnotified_receipts, init_db, upsert_receipt, upsert_shop
+from src.bot.db import create_guild, get_guild, get_unnotified_receipts, get_unnotified_reviews, init_db, upsert_receipt, upsert_review, upsert_shop
 
 
 @pytest.fixture(autouse=True)
@@ -69,3 +69,42 @@ async def test_get_unnotified_receipts(db):
 
     rows = await get_unnotified_receipts(db, shop_id=1)
     assert [r["receipt_id"] for r in rows] == [1]
+
+
+async def test_upsert_review_new_returns_true(db):
+    await upsert_shop(db, {"shop_id": 1, "shop_name": "Shop", "user_id": 9})
+    await db.commit()
+    review = {
+        "transaction_id": 500,
+        "shop_id": 1,
+        "rating": 5,
+        "review": "Great!",
+        "create_timestamp": int(time.time()),
+    }
+    assert await upsert_review(db, review) is True
+
+
+async def test_upsert_review_duplicate_returns_false(db):
+    await upsert_shop(db, {"shop_id": 1, "shop_name": "Shop", "user_id": 9})
+    await db.commit()
+    review = {
+        "transaction_id": 501,
+        "shop_id": 1,
+        "rating": 4,
+        "create_timestamp": int(time.time()),
+    }
+    await upsert_review(db, review)
+    await db.commit()
+    assert await upsert_review(db, review) is False
+
+
+async def test_get_unnotified_reviews(db):
+    await upsert_shop(db, {"shop_id": 1, "shop_name": "Shop", "user_id": 9})
+    await db.commit()
+    base = {"shop_id": 1, "rating": 5, "create_timestamp": int(time.time())}
+    await upsert_review(db, {**base, "transaction_id": 10})
+    await upsert_review(db, {**base, "transaction_id": 11}, already_seen=True)
+    await db.commit()
+
+    rows = await get_unnotified_reviews(db, shop_id=1)
+    assert [r["transaction_id"] for r in rows] == [10]

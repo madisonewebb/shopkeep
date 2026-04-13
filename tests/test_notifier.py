@@ -2,7 +2,7 @@
 
 import discord
 
-from src.bot.notifier import build_order_embed, build_shop_embed
+from src.bot.notifier import build_order_embed, build_review_embed, build_shop_embed
 
 
 def test_shop_embed_title():
@@ -86,3 +86,34 @@ def test_order_embed_no_thumbnail_when_missing():
     transactions = [{"title": "Mug"}]
     embed = build_order_embed(receipt, "My Shop", transactions=transactions)
     assert embed.thumbnail.url is None
+
+
+def test_review_embed_title_contains_stars():
+    review = {"transaction_id": 1, "rating": 5, "review": "Loved it!", "create_timestamp": 1700000000}
+    embed = build_review_embed(review, "My Shop")
+    assert "⭐⭐⭐⭐⭐" in embed.title
+    assert "(5/5)" in embed.title
+
+
+def test_review_embed_description_is_quoted_text():
+    review = {"transaction_id": 2, "rating": 4, "review": "Really nice.", "create_timestamp": 1700000000}
+    embed = build_review_embed(review, "My Shop")
+    assert embed.description == '"Really nice."'
+
+
+def test_review_embed_no_description_when_no_text():
+    review = {"transaction_id": 3, "rating": 3, "create_timestamp": 1700000000}
+    embed = build_review_embed(review, "My Shop")
+    assert embed.description is None
+
+
+def test_review_embed_footer_is_shop_name():
+    review = {"transaction_id": 4, "rating": 5, "create_timestamp": 1700000000}
+    embed = build_review_embed(review, "Acme Crafts")
+    assert embed.footer.text == "Acme Crafts"
+
+
+def test_review_embed_thumbnail_from_image_url():
+    review = {"transaction_id": 5, "rating": 5, "image_url": "https://example.com/img.jpg", "create_timestamp": 1700000000}
+    embed = build_review_embed(review, "My Shop")
+    assert embed.thumbnail.url == "https://example.com/img.jpg"
