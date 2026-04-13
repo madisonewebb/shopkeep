@@ -443,7 +443,10 @@ async def upsert_receipt(
     tax = receipt.get("total_tax_cost", {})
     discount = receipt.get("discount_amt", {})
     notified_at = int(time.time()) if already_seen else None
-    expected_ship_date = receipt.get("expected_ship_date")
+    expected_ship_date = receipt.get("expected_ship_date") or max(
+        (t.get("expected_ship_date") for t in receipt.get("transactions", []) if t.get("expected_ship_date")),
+        default=None,
+    )
 
     cursor = await db.execute(
         """
