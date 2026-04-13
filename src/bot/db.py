@@ -155,6 +155,23 @@ CREATE TABLE IF NOT EXISTS shipping_reminders (
 )
 """
 
+_CREATE_REVIEWS = """
+CREATE TABLE IF NOT EXISTS reviews (
+    transaction_id   INTEGER PRIMARY KEY,
+    shop_id          INTEGER NOT NULL REFERENCES shops(shop_id),
+    listing_id       INTEGER,
+    buyer_user_id    INTEGER,
+    rating           INTEGER NOT NULL,
+    review           TEXT,
+    language         TEXT,
+    image_url        TEXT,
+    create_timestamp INTEGER NOT NULL,
+    update_timestamp INTEGER,
+    fetched_at       INTEGER NOT NULL,
+    notified_at      INTEGER
+)
+"""
+
 
 async def init_db() -> None:
     """Create all tables if they don't exist."""
@@ -169,6 +186,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_RECEIPTS)
         await db.execute(_CREATE_SHIPPING_PRESETS)
         await db.execute(_CREATE_SHIPPING_REMINDERS)
+        await db.execute(_CREATE_REVIEWS)
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
         except Exception:
@@ -425,7 +443,10 @@ async def upsert_receipt(
     tax = receipt.get("total_tax_cost", {})
     discount = receipt.get("discount_amt", {})
     notified_at = int(time.time()) if already_seen else None
-    expected_ship_date = receipt.get("expected_ship_date")
+    expected_ship_date = receipt.get("expected_ship_date") or max(
+        (t.get("expected_ship_date") for t in receipt.get("transactions", []) if t.get("expected_ship_date")),
+        default=None,
+    )
 
     cursor = await db.execute(
         """
@@ -681,6 +702,61 @@ async def delete_preset(db: aiosqlite.Connection, guild_id: int, name: str) -> b
         (guild_id, name),
     )
     return cursor.rowcount == 1
+
+
+# ── Review helpers ────────────────────────────────────────────────────────────
+
+async def upsert_review(
+    db: aiosqlite.Connection, review: dict, already_seen: bool = False
+) -> bool:
+    """
+    Insert a new review row, ignoring conflicts to preserve notified_at.
+    Returns True if a new row was inserted.
+    """
+    notified_at = int(time.time()) if already_seen else None
+    cursor = await db.execute(
+        """
+        INSERT OR IGNORE INTO reviews (
+            transaction_id, shop_id, listing_id, buyer_user_id,
+            rating, review, language, image_url,
+            create_timestamp, update_timestamp, fetched_at, notified_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            review["transaction_id"],
+            review["shop_id"],
+            review.get("listing_id"),
+            review.get("buyer_user_id"),
+            review["rating"],
+            review.get("review"),
+            review.get("language"),
+            review.get("image_url_fullxfull"),
+            review.get("create_timestamp", int(time.time())),
+            review.get("update_timestamp"),
+            int(time.time()),
+            notified_at,
+        ),
+    )
+    return cursor.rowcount == 1
+
+
+async def get_unnotified_reviews(db: aiosqlite.Connection, shop_id: int) -> list:
+    cursor = await db.execute(
+        """
+        SELECT * FROM reviews
+        WHERE shop_id = ? AND notified_at IS NULL
+        ORDER BY create_timestamp ASC
+        """,
+        (shop_id,),
+    )
+    return await cursor.fetchall()
+
+
+async def mark_review_notified(db: aiosqlite.Connection, transaction_id: int) -> None:
+    await db.execute(
+        "UPDATE reviews SET notified_at = ? WHERE transaction_id = ?",
+        (int(time.time()), transaction_id),
+    )
 
 
 async def disconnect_guild(

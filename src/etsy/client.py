@@ -120,6 +120,18 @@ class EtsyClient:
             params["was_shipped"] = str(was_shipped).lower()
         return self._request("GET", f"/application/shops/{shop_id}/receipts", params=params)
 
+    def get_shop_reviews(
+        self,
+        shop_id: int,
+        limit: int = 25,
+        offset: int = 0,
+        min_created: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        if min_created is not None:
+            params["min_created"] = min_created
+        return self._request("GET", f"/application/shops/{shop_id}/reviews", params=params)
+
     def get_shop_listings(
         self,
         shop_id: int,
