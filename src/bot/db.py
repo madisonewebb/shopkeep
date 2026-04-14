@@ -199,6 +199,14 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_days TEXT")
         except Exception:
             pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_time TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_tz TEXT")
+        except Exception:
+            pass  # column already exists
         await db.commit()
 
 
@@ -595,19 +603,26 @@ async def mark_reminder_sent(
     )
 
 
-async def get_guild_reminder_days(
+async def get_guild_reminder_config(
     db: aiosqlite.Connection,
     guild_id: int,
-) -> list[int] | None:
-    """Return configured reminder thresholds for a guild, or None if not set."""
+) -> dict | None:
+    """Return reminder config for a guild, or None if reminders are not set.
+
+    Returns a dict with keys: days (list[int]), time (str | None), tz (str | None).
+    """
     cursor = await db.execute(
-        "SELECT ship_reminder_days FROM guilds WHERE guild_id = ?",
+        "SELECT ship_reminder_days, ship_reminder_time, ship_reminder_tz FROM guilds WHERE guild_id = ?",
         (guild_id,),
     )
     row = await cursor.fetchone()
     if row is None or row[0] is None:
         return None
-    return json.loads(row[0])
+    return {
+        "days": json.loads(row[0]),
+        "time": row[1],
+        "tz": row[2],
+    }
 
 
 async def set_guild_reminder_days(
@@ -621,12 +636,24 @@ async def set_guild_reminder_days(
     )
 
 
+async def set_guild_reminder_time(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    time_str: str,
+    tz: str,
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET ship_reminder_time = ?, ship_reminder_tz = ? WHERE guild_id = ?",
+        (time_str, tz, guild_id),
+    )
+
+
 async def disable_guild_reminders(
     db: aiosqlite.Connection,
     guild_id: int,
 ) -> None:
     await db.execute(
-        "UPDATE guilds SET ship_reminder_days = NULL WHERE guild_id = ?",
+        "UPDATE guilds SET ship_reminder_days = NULL, ship_reminder_time = NULL, ship_reminder_tz = NULL WHERE guild_id = ?",
         (guild_id,),
     )
 
