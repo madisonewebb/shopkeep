@@ -23,19 +23,10 @@ Connect/disconnect confirmation embeds: Posts a confirmation to the order channe
 /reminders - Configurable shipping deadline reminders; on by default with 1-day notice; supports multiple thresholds (e.g. /reminders set 1 2); disable with /reminders off
 /preset - Save reusable shipping package configurations (weight, dimensions, carrier, mail class) per server; supports add, list, and remove subcommands
 Review notifications: Posts a notification when a new review is left; shows star rating and review text; existing reviews are marked seen on connect to avoid spam
+Repeat customer callout: New sale embeds show a 🔁 "Returning customer!" note when the buyer has ordered before; works from locally stored receipt history, no extra API calls
 
 
 PLANNED FEATURES
-
-3. Repeat Customer Callout
-
-What: When a new order comes in from a buyer who has ordered before, flag them as a returning customer in the n
-
-Details:
-- On each new order notification, check stored order history for prior orders from the same buyer
-- If a match is found, add a "Returning customer!" note to the notification
-- No extra API calls;  works entirely from data already stored locally
-
 
 4. Out-of-Stock Notifications
 
@@ -174,8 +165,7 @@ Done:
 - /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset
 
 Planned:
-1.  Repeat customer callout
-2.  Out-of-stock notifications
+1.  Out-of-stock notifications
 3.  Order backlog warning
 4.  Daily digest (/digest)
 5.  Revenue goal tracking (/goal)
