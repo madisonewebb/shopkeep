@@ -792,7 +792,7 @@ class ShopkeepBot(discord.Client):
             status="Which orders to show (default: open only)",
         )
         @discord.app_commands.choices(status=[
-            discord.app_commands.Choice(name="Open (default)", value="open"),
+            discord.app_commands.Choice(name="Unpaid/Unshipped (default)", value="open"),
             discord.app_commands.Choice(name="All", value="all"),
             discord.app_commands.Choice(name="Completed", value="completed"),
             discord.app_commands.Choice(name="Canceled", value="canceled"),
@@ -824,7 +824,7 @@ class ShopkeepBot(discord.Client):
         @discord.app_commands.describe(
             name="Preset name (e.g. small-jewelry)",
             carrier="Shipping carrier",
-            mail_class="Mail class or service level (e.g. first_class, priority)",
+            mail_class="Shipping service (e.g. 'Priority Mail', 'First Class', 'Ground')",
             weight="Package weight (e.g. 0.3lb or 4.8oz)",
             dims="Package dimensions LxWxH in inches (e.g. 4x3x1)",
         )
@@ -856,15 +856,15 @@ class ShopkeepBot(discord.Client):
 
         reminders_group = discord.app_commands.Group(
             name="reminders",
-            description="Configure shipping deadline reminders",
+            description="Set reminders for when orders are due to ship",
         )
 
         @reminders_group.command(
             name="set",
-            description="Enable shipping reminders for specific day thresholds",
+            description="Enable shipping reminders for orders approaching their ship date",
         )
         @discord.app_commands.describe(
-            days='Day thresholds as comma-separated integers: 0=today, 1=tomorrow, 2=in 2 days (e.g. "0,1,2")',
+            days='Days before shipping deadline to remind you (0=today, 1=tomorrow). E.g. "0,1,2"',
         )
         async def reminders_set(interaction: discord.Interaction, days: str):
             await self._cmd_reminders_set(interaction, days=days)
@@ -875,14 +875,14 @@ class ShopkeepBot(discord.Client):
         )
         @discord.app_commands.describe(
             time="Time in HH:MM format (24-hour), e.g. 09:00",
-            timezone="IANA timezone name, e.g. America/New_York or US/Pacific",
+            timezone="Timezone name (e.g. America/New_York). Use autocomplete to find yours.",
         )
         @discord.app_commands.autocomplete(timezone=self._autocomplete_timezone)
         async def reminders_time(interaction: discord.Interaction, time: str, timezone: str):
             await self._cmd_reminders_time(interaction, time=time, timezone=timezone)
 
         @reminders_group.command(
-            name="disable",
+            name="off",
             description="Disable all shipping deadline reminders for this server",
         )
         async def reminders_disable(interaction: discord.Interaction):
@@ -918,7 +918,7 @@ class ShopkeepBot(discord.Client):
         @digest_group.command(name="time", description="Set the time the daily digest is posted")
         @discord.app_commands.describe(
             time="Delivery time in HH:MM format (24-hour), e.g. 09:00",
-            timezone="IANA timezone name, e.g. America/New_York or US/Pacific",
+            timezone="Timezone name (e.g. America/New_York). Use autocomplete to find yours.",
         )
         @discord.app_commands.autocomplete(timezone=self._autocomplete_timezone)
         async def digest_time(interaction: discord.Interaction, time: str, timezone: str):
@@ -950,7 +950,7 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(goal_group)
 
-        @tree.command(name="bestsellers", description="Show top listings by units sold or revenue")
+        @tree.command(name="bestsellers", description="Show top listings by units or revenue (this month / year / all-time)")
         @discord.app_commands.describe(
             period="Time period (default: this month)",
             ranked_by="Rank by units sold or revenue (default: units)",
@@ -980,17 +980,17 @@ class ShopkeepBot(discord.Client):
             ("/status", "Show Etsy connection and notification channel"),
             ("/setchannel", "Set this channel for order notifications"),
             ("/shop", "Show your Etsy shop info"),
-            ("/orders [days] [status]", "Show orders (default: last 30 days, open only)"),
+            ("/orders [days] [status]", "Show orders (default: last 30 days, unpaid/unshipped only)"),
             ("/disconnect", "Unlink your Etsy shop from this server"),
-            ("/revenue [period]", "Show revenue summary (today / this week / this month)"),
+            ("/revenue [period]", "Show revenue summary (default: this month)"),
             ("/listings", "Browse your active Etsy listings"),
-            ("/preset add", "Save a new shipping preset (carrier, mail class, weight, dims)"),
+            ("/preset add", "Save a new shipping preset (carrier, service, weight, dims)"),
             ("/preset list", "List all saved shipping presets"),
             ("/preset remove", "Delete a saved shipping preset"),
             ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
             ("/reminders time", "Set the time of day reminders fire (e.g. 09:00 America/New_York)"),
-            ("/reminders disable", "Disable all shipping deadline reminders"),
-            ("/backlog set <n>", "Warn when open unshipped orders exceed a threshold"),
+            ("/reminders off", "Disable all shipping deadline reminders"),
+            ("/backlog set <n>", "Alert when open unshipped orders exceed a threshold"),
             ("/backlog off", "Disable the order backlog warning"),
             ("/digest on", "Enable the daily digest (default: 9:00 AM UTC)"),
             ("/digest time", "Set the time and timezone for the daily digest"),
@@ -998,7 +998,7 @@ class ShopkeepBot(discord.Client):
             ("/goal set <amount>", "Set a monthly revenue goal (notifies at 25/50/75/100%)"),
             ("/goal status", "Show current progress toward your monthly goal"),
             ("/goal off", "Remove the monthly revenue goal"),
-            ("/bestsellers [period] [ranked_by]", "Top listings by units sold or revenue"),
+            ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -1089,7 +1089,11 @@ class ShopkeepBot(discord.Client):
         try:
             shop_data = await loop.run_in_executor(None, lambda: etsy.get_shop(shop_id))
         except Exception as exc:
-            await interaction.followup.send(f"Failed to fetch shop info: {exc}")
+            print(f"[shop] guild={interaction.guild_id} {exc}")
+            await interaction.followup.send(
+                "Couldn't reach Etsy right now. Try again in a moment — if it keeps failing, run `/status` to check your connection.",
+                ephemeral=True,
+            )
             return
         await interaction.followup.send(embed=build_shop_embed(shop_data))
 
@@ -1108,7 +1112,11 @@ class ShopkeepBot(discord.Client):
                 None, lambda: etsy.get_shop_receipts(shop_id, limit=50, min_created=min_created)
             )
         except Exception as exc:
-            await interaction.followup.send(f"Failed to fetch orders: {exc}")
+            print(f"[orders] guild={interaction.guild_id} {exc}")
+            await interaction.followup.send(
+                "Couldn't reach Etsy right now. Try again in a moment — if it keeps failing, run `/status` to check your connection.",
+                ephemeral=True,
+            )
             return
 
         all_receipts = response.get("results", [])
@@ -1125,7 +1133,7 @@ class ShopkeepBot(discord.Client):
 
         if not receipts:
             label = f"{status_filter} " if status_filter != "all" else ""
-            await interaction.followup.send(f"No {label}orders in the last {days} days.")
+            await interaction.followup.send(f"No {label}orders in the last {days} days.", ephemeral=True)
             return
 
         total_cents = sum((r.get("grandtotal") or {}).get("amount", 0) for r in receipts)
@@ -1196,7 +1204,9 @@ class ShopkeepBot(discord.Client):
         shop_name = shop_row["shop_name"] if shop_row else "My Shop"
 
         if not rows:
-            await interaction.followup.send("No active listings found. Data syncs every 60 seconds — try again shortly.")
+            await interaction.followup.send(
+                "No active listings found. Make sure you have active listings on Etsy — data syncs every 60 seconds."
+            )
             return
 
         pages = _build_listings_pages(rows, shop_name)
@@ -1355,7 +1365,8 @@ class ShopkeepBot(discord.Client):
             part = part.strip()
             if not part.isdigit():
                 await interaction.response.send_message(
-                    f'Invalid value `{part}`. Use integers only, e.g. `"0,1,2"`.', ephemeral=True
+                    f'`{part}` is not a valid number. Use comma-separated integers where 0=today, 1=tomorrow, etc. E.g. `"0,1,2"`.',
+                    ephemeral=True,
                 )
                 return
             val = int(part)
@@ -1435,7 +1446,7 @@ class ShopkeepBot(discord.Client):
             tz = zoneinfo.ZoneInfo(timezone)
         except (zoneinfo.ZoneInfoNotFoundError, KeyError):
             await interaction.response.send_message(
-                f"Unknown timezone `{timezone}`. Use an IANA name like `America/New_York` or `US/Pacific`.",
+                f"Unknown timezone `{timezone}`. Use the autocomplete to find a valid name (e.g. `America/New_York`, `Europe/London`).",
                 ephemeral=True,
             )
             return
@@ -1487,10 +1498,13 @@ class ShopkeepBot(discord.Client):
 
         async with db.get_db() as conn:
             await db.set_backlog_threshold(conn, interaction.guild_id, threshold)
+            guild_row = await db.get_guild(conn, interaction.guild_id)
             await conn.commit()
 
+        channel_id = guild_row["order_channel_id"] if guild_row else None
+        channel_mention = f"<#{channel_id}>" if channel_id else "your notification channel"
         await interaction.response.send_message(
-            f"Backlog warning enabled. You'll be notified when you have **{threshold} or more** open orders waiting to ship.",
+            f"Backlog warning enabled. You'll be notified in {channel_mention} when you have **{threshold} or more** open orders waiting to ship.",
             ephemeral=True,
         )
 
@@ -1550,7 +1564,7 @@ class ShopkeepBot(discord.Client):
             zoneinfo.ZoneInfo(timezone)
         except zoneinfo.ZoneInfoNotFoundError:
             await interaction.response.send_message(
-                f"`{timezone}` is not a valid timezone. Use an IANA name like `America/New_York` or `US/Pacific`.",
+                f"Unknown timezone `{timezone}`. Use the autocomplete to find a valid name (e.g. `America/New_York`, `Europe/London`).",
                 ephemeral=True,
             )
             return
@@ -1703,7 +1717,10 @@ class ShopkeepBot(discord.Client):
 
         etsy = self.etsy_clients.get(interaction.guild_id)
         if not etsy:
-            await interaction.followup.send("Etsy client not loaded. Try restarting the bot.")
+            await interaction.followup.send(
+                "Bot connection error — try again in a moment. If this persists, contact an admin.",
+                ephemeral=True,
+            )
             return None, None
 
         return etsy, guild_row["etsy_shop_id"]
