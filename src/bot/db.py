@@ -157,18 +157,19 @@ CREATE TABLE IF NOT EXISTS shipping_reminders (
 
 _CREATE_TRANSACTIONS = """
 CREATE TABLE IF NOT EXISTS transactions (
-    transaction_id   INTEGER PRIMARY KEY,
-    receipt_id       INTEGER NOT NULL REFERENCES receipts(receipt_id),
-    shop_id          INTEGER NOT NULL REFERENCES shops(shop_id),
-    listing_id       INTEGER,
-    title            TEXT,
-    quantity         INTEGER NOT NULL DEFAULT 1,
-    price_amount     INTEGER NOT NULL DEFAULT 0,
-    price_divisor    INTEGER NOT NULL DEFAULT 100,
-    price_currency   TEXT    NOT NULL DEFAULT 'USD',
-    create_timestamp INTEGER NOT NULL,
-    image_url        TEXT,
-    fetched_at       INTEGER NOT NULL
+    transaction_id      INTEGER PRIMARY KEY,
+    receipt_id          INTEGER NOT NULL REFERENCES receipts(receipt_id),
+    shop_id             INTEGER NOT NULL REFERENCES shops(shop_id),
+    listing_id          INTEGER,
+    title               TEXT,
+    quantity            INTEGER NOT NULL DEFAULT 1,
+    price_amount        INTEGER NOT NULL DEFAULT 0,
+    price_divisor       INTEGER NOT NULL DEFAULT 100,
+    price_currency      TEXT    NOT NULL DEFAULT 'USD',
+    create_timestamp    INTEGER NOT NULL,
+    image_url           TEXT,
+    selected_variations TEXT,
+    fetched_at          INTEGER NOT NULL
 )
 """
 
@@ -255,6 +256,10 @@ async def init_db() -> None:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE guilds ADD COLUMN goal_month TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE transactions ADD COLUMN selected_variations TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -497,13 +502,14 @@ async def upsert_transactions(
         price = t.get("price") or {}
         image = (t.get("listing_image") or {})
         image_url = image.get("url_75x75") or image.get("url_170x135")
+        variations = t.get("selected_variations")
         await db.execute(
             """
             INSERT OR IGNORE INTO transactions (
                 transaction_id, receipt_id, shop_id, listing_id, title,
                 quantity, price_amount, price_divisor, price_currency,
-                create_timestamp, image_url, fetched_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                create_timestamp, image_url, selected_variations, fetched_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 t["transaction_id"],
@@ -517,6 +523,7 @@ async def upsert_transactions(
                 price.get("currency_code", "USD"),
                 t.get("create_timestamp", now),
                 image_url,
+                json.dumps(variations) if variations is not None else None,
                 now,
             ),
         )
@@ -906,9 +913,11 @@ async def upsert_review(
 async def get_unnotified_reviews(db: aiosqlite.Connection, shop_id: int) -> list:
     cursor = await db.execute(
         """
-        SELECT * FROM reviews
-        WHERE shop_id = ? AND notified_at IS NULL
-        ORDER BY create_timestamp ASC
+        SELECT r.*, t.title AS listing_title
+        FROM reviews r
+        LEFT JOIN transactions t ON t.transaction_id = r.transaction_id
+        WHERE r.shop_id = ? AND r.notified_at IS NULL
+        ORDER BY r.create_timestamp ASC
         """,
         (shop_id,),
     )
@@ -1035,6 +1044,15 @@ async def get_receipts_due_within(
         (shop_id, deadline),
     )
     return await cursor.fetchall()
+
+
+async def get_shop_currency(db: aiosqlite.Connection, shop_id: int) -> str:
+    """Return the currency_code for a shop, defaulting to USD."""
+    cursor = await db.execute(
+        "SELECT currency_code FROM shops WHERE shop_id = ?", (shop_id,)
+    )
+    row = await cursor.fetchone()
+    return row["currency_code"] if row else "USD"
 
 
 async def get_open_order_count(db: aiosqlite.Connection, shop_id: int) -> int:

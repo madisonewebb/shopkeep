@@ -32,11 +32,21 @@ class OrdersView(discord.ui.View):
         super().__init__(timeout=120)
         self.pages = pages
         self.current = 0
+        self.message: discord.Message | None = None
         self._update_buttons()
 
     def _update_buttons(self):
         self.prev_button.disabled = self.current == 0
         self.next_button.disabled = self.current == len(self.pages) - 1
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.NotFound:
+                pass
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -197,6 +207,7 @@ class ShopkeepBot(discord.Client):
         self._bootstrapped_guilds: set[int] = set()
         self._bootstrapped = False
         self._last_polled: dict[int, int] = {}
+        self._poll_tick: int = 0
 
     async def setup_hook(self):
         db.DB_PATH = DB_PATH_ENV
@@ -400,6 +411,8 @@ class ShopkeepBot(discord.Client):
                 finally:
                     self._bootstrapped_guilds.add(guild_id)
 
+        self._poll_tick += 1
+
         await asyncio.gather(*(
             self._safe_poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
             for row in guild_rows
@@ -551,7 +564,11 @@ class ShopkeepBot(discord.Client):
             r["grandtotal_amount"] / (r["grandtotal_divisor"] or 100)
             for r in receipts_24h
         )
-        currency = receipts_24h[0]["grandtotal_currency"] if receipts_24h else "USD"
+        currency = (
+            receipts_24h[0]["grandtotal_currency"]
+            if receipts_24h
+            else await db.get_shop_currency(conn, shop_id)
+        )
         open_count = await db.get_open_order_count(conn, shop_id)
         due_soon = await db.get_receipts_due_within(conn, shop_id, within_seconds=2 * 86400, now=now_ts)
 
@@ -714,27 +731,36 @@ class ShopkeepBot(discord.Client):
         channel,
         shop_name: str,
     ) -> None:
-        """Fetch recent reviews, store any new ones, and post notifications."""
+        """Fetch recent reviews, store any new ones, and post notifications.
+
+        The API call is only made every 5th poll cycle (~5 minutes) to conserve
+        API budget. Unnotified rows accumulated in the interim are still flushed
+        every cycle.
+        """
         etsy = self.etsy_clients.get(guild_id)
         if not etsy or channel is None:
             return
         loop = asyncio.get_running_loop()
-        try:
-            response = await loop.run_in_executor(
-                None, lambda: etsy.get_shop_reviews(shop_id, limit=25)
-            )
-        except Exception as exc:
-            print(f"[poller] reviews guild={guild_id} {exc}")
-            return
-        reviews = response.get("results", [])
-        for review in reviews:
-            review["shop_id"] = shop_id
-            await db.upsert_review(conn, review)
-        await conn.commit()
+
+        if self._poll_tick % 5 == 0:
+            try:
+                response = await loop.run_in_executor(
+                    None, lambda: etsy.get_shop_reviews(shop_id, limit=25)
+                )
+            except Exception as exc:
+                print(f"[poller] reviews guild={guild_id} {exc}")
+                return
+            reviews = response.get("results", [])
+            for review in reviews:
+                review["shop_id"] = shop_id
+                await db.upsert_review(conn, review)
+            await conn.commit()
 
         unnotified = await db.get_unnotified_reviews(conn, shop_id)
         for row in unnotified:
-            embed = build_review_embed(dict(row), shop_name=shop_name)
+            embed = build_review_embed(
+                dict(row), shop_name=shop_name, listing_title=row["listing_title"]
+            )
             await channel.send(embed=embed)
             await db.mark_review_notified(conn, row["transaction_id"])
             await conn.commit()
@@ -1111,7 +1137,9 @@ class ShopkeepBot(discord.Client):
         if len(pages) == 1:
             await interaction.followup.send(embed=pages[0])
         else:
-            await interaction.followup.send(embed=pages[0], view=OrdersView(pages))
+            view = OrdersView(pages)
+            msg = await interaction.followup.send(embed=pages[0], view=view)
+            view.message = msg
 
     async def _cmd_disconnect(self, interaction: discord.Interaction) -> None:
         if not interaction.user.guild_permissions.manage_guild:
