@@ -218,7 +218,7 @@ def build_order_embed(
 
     embed = discord.Embed(
         title=title,
-        url=receipt_url if not new else None,
+        url=receipt_url,
         description=description,
         color=color,
     )
@@ -267,21 +267,28 @@ def build_order_embed(
     return embed
 
 
-def build_review_embed(review: dict, shop_name: str) -> discord.Embed:
+def build_review_embed(review: dict, shop_name: str, listing_title: str | None = None) -> discord.Embed:
     """
     Build a Discord embed for a new shop review notification.
 
     Args:
         review: A dict of review DB columns (snake_case).
         shop_name: Human-readable shop name shown in the footer.
+        listing_title: Title of the listing being reviewed, if known.
     """
     rating = review.get("rating", 0)
     stars = "⭐" * rating + f" ({rating}/5)"
     review_text = review.get("review", "").strip()
 
+    description_parts = []
+    if listing_title:
+        description_parts.append(f"**{listing_title}**")
+    if review_text:
+        description_parts.append(f'"{review_text}"')
+
     embed = discord.Embed(
         title=f"New Review: {stars}",
-        description=f'"{review_text}"' if review_text else None,
+        description="\n".join(description_parts) if description_parts else None,
         color=discord.Color.gold(),
     )
 
@@ -349,7 +356,7 @@ def build_goal_milestone_embed(
 ) -> discord.Embed:
     """Build a Discord embed for a revenue goal milestone notification."""
     color = discord.Color.gold() if milestone_pct == 100 else discord.Color.green()
-    title = f"Goal Reached! 🎯" if milestone_pct == 100 else f"Goal Milestone: {milestone_pct}%"
+    title = "Goal Reached! 🎯" if milestone_pct == 100 else f"Goal Milestone: {milestone_pct}%"
     embed = discord.Embed(
         title=title,
         description=(
