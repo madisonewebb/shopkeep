@@ -888,6 +888,13 @@ class ShopkeepBot(discord.Client):
         async def reminders_disable(interaction: discord.Interaction):
             await self._cmd_reminders_disable(interaction)
 
+        @reminders_group.command(
+            name="status",
+            description="Show the current shipping reminder configuration for this server",
+        )
+        async def reminders_status(interaction: discord.Interaction):
+            await self._cmd_reminders_status(interaction)
+
         tree.add_command(reminders_group)
 
         backlog_group = discord.app_commands.Group(
@@ -990,6 +997,7 @@ class ShopkeepBot(discord.Client):
             ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
             ("/reminders time", "Set the time of day reminders fire (e.g. 09:00 America/New_York)"),
             ("/reminders off", "Disable all shipping deadline reminders"),
+            ("/reminders status", "Show the current shipping reminder configuration"),
             ("/backlog set <n>", "Alert when open unshipped orders exceed a threshold"),
             ("/backlog off", "Disable the order backlog warning"),
             ("/digest on", "Enable the daily digest (default: 9:00 AM UTC)"),
@@ -1483,6 +1491,40 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(
             "Shipping deadline reminders have been disabled.", ephemeral=True
         )
+
+    async def _cmd_reminders_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            config = await db.get_guild_reminder_config(conn, interaction.guild_id)
+
+        if not config:
+            await interaction.response.send_message(
+                "Shipping reminders are **disabled**. Use `/reminders set` to enable them.",
+                ephemeral=True,
+            )
+            return
+
+        threshold_labels = {0: "Today", 1: "Tomorrow"}
+        day_labels = [threshold_labels.get(d, f"{d} days out") for d in config["days"]]
+
+        if config["time"] and config["tz"]:
+            try:
+                import zoneinfo
+                tz = zoneinfo.ZoneInfo(config["tz"])
+                abbr = datetime.datetime.now(tz).strftime("%Z")
+                time_str = f"**{config['time']} {abbr}** (`{config['tz']}`)"
+            except Exception:
+                time_str = f"**{config['time']}** (`{config['tz']}`)"
+        else:
+            time_str = "any poll cycle (no specific time set)"
+
+        embed = discord.Embed(
+            title="Shipping Reminder Status",
+            color=discord.Color.blurple(),
+        )
+        embed.add_field(name="Status", value="Enabled", inline=False)
+        embed.add_field(name="Remind me", value=", ".join(day_labels), inline=False)
+        embed.add_field(name="Fire time", value=time_str, inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_backlog_set(self, interaction: discord.Interaction, threshold: int) -> None:
         if not interaction.user.guild_permissions.manage_guild:
