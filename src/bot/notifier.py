@@ -470,6 +470,7 @@ def build_shipping_reminder_embed(
     receipt: dict,
     shop_name: str,
     days_before: int,
+    transactions: list | None = None,
 ) -> discord.Embed:
     """
     Build a Discord embed for a shipping deadline reminder.
@@ -514,6 +515,37 @@ def build_shipping_reminder_embed(
             value=f"<t:{expected_ship_date}:D>",
             inline=True,
         )
+
+    if transactions:
+        item_lines = []
+        thumbnail_url = None
+        for t in transactions:
+            if not t.get("title"):
+                continue
+            qty = t.get("quantity", 1)
+            line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
+            variations = t.get("selected_variations") or []
+            if variations:
+                var_parts = []
+                for v in variations:
+                    if not (v.get("formatted_name") and v.get("formatted_value")):
+                        continue
+                    name_lower = v["formatted_name"].lower()
+                    value = v["formatted_value"]
+                    # Wrap personalization text in spoiler tags so it's expandable
+                    if "personal" in name_lower or "custom" in name_lower or "engrav" in name_lower:
+                        var_parts.append(f"{v['formatted_name']}: ||{value}||")
+                    else:
+                        var_parts.append(f"{v['formatted_name']}: {value}")
+                if var_parts:
+                    line += "\n  " + ", ".join(var_parts)
+            item_lines.append(line)
+            if thumbnail_url is None and t.get("image_url"):
+                thumbnail_url = t["image_url"]
+        if item_lines:
+            embed.add_field(name="Items", value="\n".join(item_lines), inline=False)
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
 
     create_timestamp = receipt.get("create_timestamp")
     if create_timestamp:

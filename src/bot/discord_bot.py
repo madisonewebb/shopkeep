@@ -718,7 +718,8 @@ class ShopkeepBot(discord.Client):
         for days_before in reminder_days:
             pending = await db.get_pending_reminders(conn, shop_id, days_before, now)
             for row in pending:
-                embed = build_shipping_reminder_embed(dict(row), shop_name, days_before)
+                txns = await db.get_receipt_transactions(conn, row["receipt_id"])
+                embed = build_shipping_reminder_embed(dict(row), shop_name, days_before, transactions=txns)
                 await channel.send(embed=embed)
                 await db.mark_reminder_sent(conn, row["receipt_id"], days_before)
                 await conn.commit()
