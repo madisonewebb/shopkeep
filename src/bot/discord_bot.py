@@ -10,7 +10,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_connected_embed, build_disconnect_embed, build_order_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 
 load_dotenv()
@@ -345,6 +345,9 @@ class ShopkeepBot(discord.Client):
             for receipt in receipts:
                 receipt.setdefault("shop_id", shop_id)
                 await db.upsert_receipt(conn, receipt, already_seen=True)
+                await db.upsert_transactions(
+                    conn, receipt["receipt_id"], shop_id, receipt.get("transactions", [])
+                )
             for review in reviews:
                 review["shop_id"] = shop_id
                 await db.upsert_review(conn, review, already_seen=True)
@@ -422,13 +425,40 @@ class ShopkeepBot(discord.Client):
         response = await loop.run_in_executor(
             None, lambda: etsy.get_shop_receipts(shop_id, limit=50)
         )
+        listings_resp = await loop.run_in_executor(
+            None, lambda: etsy.get_shop_listings(shop_id, limit=100)
+        )
         receipts = response.get("results", [])
+        listings = listings_resp.get("results", [])
         raw_by_id = {r["receipt_id"]: r for r in receipts}
         channel = self.get_channel(channel_id)
         shop_name = shop_data.get("shop_name", "My Shop")
 
         async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
+
+            # Snapshot listing quantities before upsert to detect zero-crossings
+            listing_ids = [l["listing_id"] for l in listings]
+            qty_snapshot = await db.get_listing_quantity_snapshot(conn, listing_ids)
+            await db.upsert_listings(conn, listings)
+            await conn.commit()
+
+            if channel:
+                for listing in listings:
+                    lid = listing["listing_id"]
+                    old_qty = qty_snapshot.get(lid)
+                    new_qty = listing.get("quantity", 0)
+                    # Only fire if listing was previously known (old_qty is not None),
+                    # had stock, and now has none
+                    if old_qty is not None and old_qty > 0 and new_qty == 0:
+                        first_image = (listing.get("images") or [{}])[0]
+                        listing_row = {
+                            "listing_id": lid,
+                            "title": listing.get("title", ""),
+                            "url": listing.get("url"),
+                            "image_url": first_image.get("url_75x75") or first_image.get("url_170x135"),
+                        }
+                        await channel.send(embed=build_out_of_stock_embed(listing_row, shop_name))
 
             # Snapshot status before upserting so we can detect changes
             receipt_ids = [r["receipt_id"] for r in receipts]
@@ -437,6 +467,9 @@ class ShopkeepBot(discord.Client):
             for receipt in receipts:
                 receipt.setdefault("shop_id", shop_id)
                 await db.upsert_receipt(conn, receipt)
+                await db.upsert_transactions(
+                    conn, receipt["receipt_id"], shop_id, receipt.get("transactions", [])
+                )
             await conn.commit()
 
             # Post status change notifications for already-seen receipts
@@ -471,10 +504,171 @@ class ShopkeepBot(discord.Client):
                     await db.mark_receipt_notified(conn, row["receipt_id"])
                     await conn.commit()
 
+            await self._check_backlog(conn, guild_id, shop_id, channel, shop_name)
+            await self._check_goal_milestones(conn, guild_id, shop_id, channel, shop_name)
+            await self._check_digest(conn, guild_id, shop_id, channel, shop_name)
             await self._check_shipping_reminders(conn, guild_id, shop_id, channel, shop_name)
             await self._check_new_reviews(conn, guild_id, shop_id, channel, shop_name)
 
         self._last_polled[guild_id] = int(time.time())
+
+    async def _check_digest(
+        self,
+        conn,
+        guild_id: int,
+        shop_id: int,
+        channel,
+        shop_name: str,
+    ) -> None:
+        """Post the daily digest at the configured time, at most once per day."""
+        config = await db.get_digest_config(conn, guild_id)
+        if not config or channel is None:
+            return
+
+        try:
+            tz = zoneinfo.ZoneInfo(config["tz"])
+        except zoneinfo.ZoneInfoNotFoundError:
+            tz = datetime.timezone.utc
+
+        now_local = datetime.datetime.now(tz)
+        h, m = map(int, config["time"].split(":"))
+        target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
+        diff = abs((now_local - target).total_seconds())
+        if diff > POLL_INTERVAL_SECS / 2:
+            return
+
+        # Don't send more than once per day (23h cooldown)
+        last_sent = config["last_sent"]
+        now_ts = int(time.time())
+        if last_sent and (now_ts - last_sent) < 23 * 3600:
+            return
+
+        # Gather digest data
+        since_24h = now_ts - 86400
+        receipts_24h = await db.get_receipts_since(conn, shop_id, since_24h)
+        order_count = len(receipts_24h)
+        revenue = sum(
+            r["grandtotal_amount"] / (r["grandtotal_divisor"] or 100)
+            for r in receipts_24h
+        )
+        currency = receipts_24h[0]["grandtotal_currency"] if receipts_24h else "USD"
+        open_count = await db.get_open_order_count(conn, shop_id)
+        due_soon = await db.get_receipts_due_within(conn, shop_id, within_seconds=2 * 86400, now=now_ts)
+
+        # Include goal progress if configured
+        goal_amount = goal_current = goal_pct = None
+        goal_config = await db.get_goal_config(conn, guild_id)
+        if goal_config:
+            now_dt = datetime.datetime.now(datetime.timezone.utc)
+            month_start = datetime.datetime(now_dt.year, now_dt.month, 1, tzinfo=datetime.timezone.utc)
+            month_receipts = await db.get_receipts_since(conn, shop_id, int(month_start.timestamp()))
+            goal_current = sum(r["grandtotal_amount"] / (r["grandtotal_divisor"] or 100) for r in month_receipts)
+            goal_amount = goal_config["amount_cents"] / 100
+            goal_pct = int(goal_current / goal_amount * 100) if goal_amount > 0 else 0
+
+        await channel.send(
+            embed=build_digest_embed(
+                orders_24h=order_count,
+                revenue_24h=revenue,
+                currency=currency,
+                open_count=open_count,
+                due_soon=[dict(r) for r in due_soon],
+                shop_name=shop_name,
+                goal_amount=goal_amount,
+                goal_current=goal_current,
+                goal_pct=goal_pct,
+            )
+        )
+        await db.mark_digest_sent(conn, guild_id, now_ts)
+        await conn.commit()
+
+    async def _check_goal_milestones(
+        self,
+        conn,
+        guild_id: int,
+        shop_id: int,
+        channel,
+        shop_name: str,
+    ) -> None:
+        """Fire milestone notifications when monthly revenue crosses 25/50/75/100% of the goal."""
+        config = await db.get_goal_config(conn, guild_id)
+        if not config or channel is None:
+            return
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        current_month = now.strftime("%Y-%m")
+
+        # Reset milestones at the start of a new month
+        milestones_sent = config["milestones_sent"]
+        if config["month"] != current_month:
+            milestones_sent = []
+
+        # Monthly revenue: sum receipts from the first of this month
+        month_start = datetime.datetime(now.year, now.month, 1, tzinfo=datetime.timezone.utc)
+        receipts = await db.get_receipts_since(conn, shop_id, int(month_start.timestamp()))
+        if not receipts:
+            if config["month"] != current_month:
+                await db.update_goal_milestones(conn, guild_id, [], current_month)
+                await conn.commit()
+            return
+
+        revenue = sum(r["grandtotal_amount"] / (r["grandtotal_divisor"] or 100) for r in receipts)
+        currency = receipts[0]["grandtotal_currency"]
+        goal_dollars = config["amount_cents"] / 100
+        pct = int(revenue / goal_dollars * 100) if goal_dollars > 0 else 0
+
+        # Days left in month
+        import calendar
+        days_in_month = calendar.monthrange(now.year, now.month)[1]
+        days_left = days_in_month - now.day
+
+        month_name = now.strftime("%B")
+
+        newly_sent = list(milestones_sent)
+        for milestone in [25, 50, 75, 100]:
+            if pct >= milestone and milestone not in milestones_sent:
+                await channel.send(
+                    embed=build_goal_milestone_embed(
+                        milestone_pct=milestone,
+                        current=revenue,
+                        goal=goal_dollars,
+                        currency=currency,
+                        month_name=month_name,
+                        days_left=days_left,
+                        shop_name=shop_name,
+                    )
+                )
+                newly_sent.append(milestone)
+
+        if newly_sent != milestones_sent or config["month"] != current_month:
+            await db.update_goal_milestones(conn, guild_id, newly_sent, current_month)
+            await conn.commit()
+
+    async def _check_backlog(
+        self,
+        conn,
+        guild_id: int,
+        shop_id: int,
+        channel,
+        shop_name: str,
+    ) -> None:
+        """Post a one-time warning when open unshipped orders exceed the configured threshold."""
+        config = await db.get_backlog_config(conn, guild_id)
+        if not config or channel is None:
+            return
+
+        threshold = config["threshold"]
+        warned = config["warned"]
+        count = await db.get_open_order_count(conn, shop_id)
+
+        if count >= threshold and not warned:
+            await channel.send(embed=build_backlog_embed(count, threshold, shop_name))
+            await db.set_backlog_warned(conn, guild_id, True)
+            await conn.commit()
+        elif count < threshold and warned:
+            # Backlog cleared — reset so warning can fire again next time
+            await db.set_backlog_warned(conn, guild_id, False)
+            await conn.commit()
 
     async def _check_shipping_reminders(
         self,
@@ -670,6 +864,89 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(reminders_group)
 
+        backlog_group = discord.app_commands.Group(
+            name="backlog",
+            description="Configure the order backlog warning",
+        )
+
+        @backlog_group.command(name="set", description="Warn when open orders exceed a threshold")
+        @discord.app_commands.describe(threshold="Number of open orders that triggers a warning")
+        async def backlog_set(interaction: discord.Interaction, threshold: int):
+            await self._cmd_backlog_set(interaction, threshold=threshold)
+
+        @backlog_group.command(name="off", description="Disable the order backlog warning")
+        async def backlog_off(interaction: discord.Interaction):
+            await self._cmd_backlog_off(interaction)
+
+        tree.add_command(backlog_group)
+
+        digest_group = discord.app_commands.Group(
+            name="digest",
+            description="Configure the daily order digest",
+        )
+
+        @digest_group.command(name="on", description="Enable the daily digest (default: 9:00 AM UTC)")
+        async def digest_on(interaction: discord.Interaction):
+            await self._cmd_digest_on(interaction)
+
+        @digest_group.command(name="time", description="Set the time the daily digest is posted")
+        @discord.app_commands.describe(
+            time="Delivery time in HH:MM format (24-hour), e.g. 09:00",
+            timezone="IANA timezone name, e.g. America/New_York or US/Pacific",
+        )
+        @discord.app_commands.autocomplete(timezone=self._autocomplete_timezone)
+        async def digest_time(interaction: discord.Interaction, time: str, timezone: str):
+            await self._cmd_digest_time(interaction, time=time, timezone=timezone)
+
+        @digest_group.command(name="off", description="Disable the daily digest")
+        async def digest_off(interaction: discord.Interaction):
+            await self._cmd_digest_off(interaction)
+
+        tree.add_command(digest_group)
+
+        goal_group = discord.app_commands.Group(
+            name="goal",
+            description="Set and track a monthly revenue goal",
+        )
+
+        @goal_group.command(name="set", description="Set a monthly revenue goal")
+        @discord.app_commands.describe(amount="Target revenue in dollars (e.g. 500)")
+        async def goal_set(interaction: discord.Interaction, amount: int):
+            await self._cmd_goal_set(interaction, amount=amount)
+
+        @goal_group.command(name="status", description="Show current progress toward your monthly goal")
+        async def goal_status(interaction: discord.Interaction):
+            await self._cmd_goal_status(interaction)
+
+        @goal_group.command(name="off", description="Remove the monthly revenue goal")
+        async def goal_off(interaction: discord.Interaction):
+            await self._cmd_goal_off(interaction)
+
+        tree.add_command(goal_group)
+
+        @tree.command(name="bestsellers", description="Show top listings by units sold or revenue")
+        @discord.app_commands.describe(
+            period="Time period (default: this month)",
+            ranked_by="Rank by units sold or revenue (default: units)",
+        )
+        @discord.app_commands.choices(
+            period=[
+                discord.app_commands.Choice(name="This month", value="this_month"),
+                discord.app_commands.Choice(name="This year", value="this_year"),
+                discord.app_commands.Choice(name="All time", value="all_time"),
+            ],
+            ranked_by=[
+                discord.app_commands.Choice(name="Units sold", value="units"),
+                discord.app_commands.Choice(name="Revenue", value="revenue"),
+            ],
+        )
+        async def bestsellers(
+            interaction: discord.Interaction,
+            period: str = "this_month",
+            ranked_by: str = "units",
+        ):
+            await self._cmd_bestsellers(interaction, period=period, ranked_by=ranked_by)
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -687,6 +964,15 @@ class ShopkeepBot(discord.Client):
             ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
             ("/reminders time", "Set the time of day reminders fire (e.g. 09:00 America/New_York)"),
             ("/reminders disable", "Disable all shipping deadline reminders"),
+            ("/backlog set <n>", "Warn when open unshipped orders exceed a threshold"),
+            ("/backlog off", "Disable the order backlog warning"),
+            ("/digest on", "Enable the daily digest (default: 9:00 AM UTC)"),
+            ("/digest time", "Set the time and timezone for the daily digest"),
+            ("/digest off", "Disable the daily digest"),
+            ("/goal set <amount>", "Set a monthly revenue goal (notifies at 25/50/75/100%)"),
+            ("/goal status", "Show current progress toward your monthly goal"),
+            ("/goal off", "Remove the monthly revenue goal"),
+            ("/bestsellers [period] [ranked_by]", "Top listings by units sold or revenue"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -1158,6 +1444,220 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(
             "Shipping deadline reminders have been disabled.", ephemeral=True
         )
+
+    async def _cmd_backlog_set(self, interaction: discord.Interaction, threshold: int) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+        if threshold < 1:
+            await interaction.response.send_message(
+                "Threshold must be at least 1.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.set_backlog_threshold(conn, interaction.guild_id, threshold)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            f"Backlog warning enabled. You'll be notified when you have **{threshold} or more** open orders waiting to ship.",
+            ephemeral=True,
+        )
+
+    async def _cmd_backlog_off(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.set_backlog_threshold(conn, interaction.guild_id, None)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            "Backlog warning has been disabled.", ephemeral=True
+        )
+
+    async def _cmd_digest_on(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.set_digest_config(conn, interaction.guild_id, "09:00", "UTC")
+            await conn.commit()
+
+        await interaction.response.send_message(
+            "Daily digest enabled. I'll post a summary every day at **9:00 AM UTC**.\n"
+            "Use `/digest time` to set a different time and timezone.",
+            ephemeral=True,
+        )
+
+    async def _cmd_digest_time(
+        self, interaction: discord.Interaction, time: str, timezone: str
+    ) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        try:
+            h, m = map(int, time.split(":"))
+            if not (0 <= h <= 23 and 0 <= m <= 59):
+                raise ValueError
+        except ValueError:
+            await interaction.response.send_message(
+                "Invalid time format. Use HH:MM (24-hour), e.g. `09:00` or `14:30`.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            zoneinfo.ZoneInfo(timezone)
+        except zoneinfo.ZoneInfoNotFoundError:
+            await interaction.response.send_message(
+                f"`{timezone}` is not a valid timezone. Use an IANA name like `America/New_York` or `US/Pacific`.",
+                ephemeral=True,
+            )
+            return
+
+        time_str = f"{h:02d}:{m:02d}"
+        async with db.get_db() as conn:
+            await db.set_digest_config(conn, interaction.guild_id, time_str, timezone)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            f"Daily digest will be posted at **{time_str}** ({timezone}).",
+            ephemeral=True,
+        )
+
+    async def _cmd_digest_off(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.disable_digest(conn, interaction.guild_id)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            "Daily digest has been disabled.", ephemeral=True
+        )
+
+    async def _cmd_goal_set(self, interaction: discord.Interaction, amount: int) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+        if amount < 1:
+            await interaction.response.send_message("Goal must be at least $1.", ephemeral=True)
+            return
+
+        async with db.get_db() as conn:
+            await db.set_goal_amount(conn, interaction.guild_id, amount * 100)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            f"Monthly revenue goal set to **${amount:,}**. "
+            "You'll be notified at 25%, 50%, 75%, and 100%.",
+            ephemeral=True,
+        )
+
+    async def _cmd_goal_status(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                await interaction.followup.send("No Etsy shop connected.", ephemeral=True)
+                return
+            goal_config = await db.get_goal_config(conn, interaction.guild_id)
+            if not goal_config:
+                await interaction.followup.send(
+                    "No goal set. Use `/goal set <amount>` to set one.", ephemeral=True
+                )
+                return
+            now_dt = datetime.datetime.now(datetime.timezone.utc)
+            month_start = datetime.datetime(now_dt.year, now_dt.month, 1, tzinfo=datetime.timezone.utc)
+            month_receipts = await db.get_receipts_since(
+                conn, guild_row["etsy_shop_id"], int(month_start.timestamp())
+            )
+
+        revenue = sum(r["grandtotal_amount"] / (r["grandtotal_divisor"] or 100) for r in month_receipts)
+        currency = month_receipts[0]["grandtotal_currency"] if month_receipts else "USD"
+        goal_dollars = goal_config["amount_cents"] / 100
+        pct = int(revenue / goal_dollars * 100) if goal_dollars > 0 else 0
+
+        import calendar
+        days_in_month = calendar.monthrange(now_dt.year, now_dt.month)[1]
+        days_left = days_in_month - now_dt.day
+        month_name = now_dt.strftime("%B")
+
+        embed = discord.Embed(
+            title=f"{month_name} Revenue Goal",
+            description=(
+                f"**${revenue:.2f}** of **${goal_dollars:.2f}** {currency} — **{pct}%**\n"
+                f"{days_left} day{'s' if days_left != 1 else ''} remaining in {month_name}."
+            ),
+            color=discord.Color.gold() if pct >= 100 else discord.Color.blurple(),
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    async def _cmd_goal_off(self, interaction: discord.Interaction) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.disable_goal(conn, interaction.guild_id)
+            await conn.commit()
+
+        await interaction.response.send_message("Monthly revenue goal removed.", ephemeral=True)
+
+    async def _cmd_bestsellers(
+        self, interaction: discord.Interaction, period: str, ranked_by: str
+    ) -> None:
+        await interaction.response.defer()
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        if period == "this_month":
+            since = datetime.datetime(now.year, now.month, 1, tzinfo=datetime.timezone.utc)
+            period_label = now.strftime("%B %Y")
+        elif period == "this_year":
+            since = datetime.datetime(now.year, 1, 1, tzinfo=datetime.timezone.utc)
+            period_label = str(now.year)
+        else:
+            since = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+            period_label = "All Time"
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                await interaction.followup.send("No Etsy shop connected. Run `/status` to get started.")
+                return
+            shop_id = guild_row["etsy_shop_id"]
+            shop_row = await conn.execute("SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,))
+            shop_row = await shop_row.fetchone()
+            shop_name = shop_row["shop_name"] if shop_row else "My Shop"
+            rows = await db.get_bestsellers(conn, shop_id, int(since.timestamp()), ranked_by=ranked_by)
+
+        embed = build_bestsellers_embed(
+            [dict(r) for r in rows],
+            period_label=period_label,
+            ranked_by=ranked_by,
+            shop_name=shop_name,
+        )
+        await interaction.followup.send(embed=embed)
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction

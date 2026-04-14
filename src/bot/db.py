@@ -155,6 +155,23 @@ CREATE TABLE IF NOT EXISTS shipping_reminders (
 )
 """
 
+_CREATE_TRANSACTIONS = """
+CREATE TABLE IF NOT EXISTS transactions (
+    transaction_id   INTEGER PRIMARY KEY,
+    receipt_id       INTEGER NOT NULL REFERENCES receipts(receipt_id),
+    shop_id          INTEGER NOT NULL REFERENCES shops(shop_id),
+    listing_id       INTEGER,
+    title            TEXT,
+    quantity         INTEGER NOT NULL DEFAULT 1,
+    price_amount     INTEGER NOT NULL DEFAULT 0,
+    price_divisor    INTEGER NOT NULL DEFAULT 100,
+    price_currency   TEXT    NOT NULL DEFAULT 'USD',
+    create_timestamp INTEGER NOT NULL,
+    image_url        TEXT,
+    fetched_at       INTEGER NOT NULL
+)
+"""
+
 _CREATE_REVIEWS = """
 CREATE TABLE IF NOT EXISTS reviews (
     transaction_id   INTEGER PRIMARY KEY,
@@ -186,6 +203,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_RECEIPTS)
         await db.execute(_CREATE_SHIPPING_PRESETS)
         await db.execute(_CREATE_SHIPPING_REMINDERS)
+        await db.execute(_CREATE_TRANSACTIONS)
         await db.execute(_CREATE_REVIEWS)
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
@@ -205,6 +223,38 @@ async def init_db() -> None:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE guilds ADD COLUMN ship_reminder_tz TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN backlog_threshold INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN backlog_warned INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN digest_time TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN digest_tz TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN digest_last_sent INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN goal_amount INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN goal_milestones_sent TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN goal_month TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -438,6 +488,77 @@ async def upsert_listings(db: aiosqlite.Connection, listings: list) -> None:
         await upsert_listing(db, listing)
 
 
+async def upsert_transactions(
+    db: aiosqlite.Connection, receipt_id: int, shop_id: int, transactions: list
+) -> None:
+    """Upsert line-item transactions from a receipt. Ignores conflicts (write-once)."""
+    now = int(time.time())
+    for t in transactions:
+        price = t.get("price") or {}
+        image = (t.get("listing_image") or {})
+        image_url = image.get("url_75x75") or image.get("url_170x135")
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO transactions (
+                transaction_id, receipt_id, shop_id, listing_id, title,
+                quantity, price_amount, price_divisor, price_currency,
+                create_timestamp, image_url, fetched_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                t["transaction_id"],
+                receipt_id,
+                shop_id,
+                t.get("listing_id"),
+                t.get("title"),
+                t.get("quantity", 1),
+                price.get("amount", 0),
+                price.get("divisor", 100),
+                price.get("currency_code", "USD"),
+                t.get("create_timestamp", now),
+                image_url,
+                now,
+            ),
+        )
+
+
+async def get_bestsellers(
+    db: aiosqlite.Connection,
+    shop_id: int,
+    since_timestamp: int,
+    ranked_by: str = "units",
+    limit: int = 5,
+) -> list:
+    """Return top listings by units sold or revenue for a shop since a given timestamp.
+
+    ranked_by: "units" (default) or "revenue".
+    Excludes transactions from canceled receipts.
+    """
+    order_col = "units_sold" if ranked_by == "units" else "total_revenue"
+    cursor = await db.execute(
+        f"""
+        SELECT
+            t.listing_id,
+            t.title,
+            t.image_url,
+            SUM(t.quantity) AS units_sold,
+            SUM(t.quantity * CAST(t.price_amount AS REAL) / t.price_divisor) AS total_revenue,
+            t.price_currency AS currency
+        FROM transactions t
+        JOIN receipts r ON r.receipt_id = t.receipt_id
+        WHERE t.shop_id = ?
+          AND t.listing_id IS NOT NULL
+          AND t.create_timestamp >= ?
+          AND LOWER(r.status) != 'canceled'
+        GROUP BY t.listing_id, t.title
+        ORDER BY {order_col} DESC
+        LIMIT ?
+        """,
+        (shop_id, since_timestamp, limit),
+    )
+    return await cursor.fetchall()
+
+
 async def upsert_receipt(
     db: aiosqlite.Connection, receipt: dict, already_seen: bool = False
 ) -> bool:
@@ -658,6 +779,21 @@ async def disable_guild_reminders(
     )
 
 
+async def get_listing_quantity_snapshot(
+    db: aiosqlite.Connection, listing_ids: list[int]
+) -> dict[int, int]:
+    """Return {listing_id: quantity} for all known listing IDs."""
+    if not listing_ids:
+        return {}
+    placeholders = ",".join("?" * len(listing_ids))
+    cursor = await db.execute(
+        f"SELECT listing_id, quantity FROM listings WHERE listing_id IN ({placeholders})",
+        listing_ids,
+    )
+    rows = await cursor.fetchall()
+    return {row["listing_id"]: row["quantity"] for row in rows}
+
+
 async def get_active_listings(db: aiosqlite.Connection, shop_id: int) -> list:
     """Return all active listings for a shop, ordered by title."""
     cursor = await db.execute(
@@ -783,6 +919,170 @@ async def mark_review_notified(db: aiosqlite.Connection, transaction_id: int) ->
     await db.execute(
         "UPDATE reviews SET notified_at = ? WHERE transaction_id = ?",
         (int(time.time()), transaction_id),
+    )
+
+
+async def get_goal_config(
+    db: aiosqlite.Connection, guild_id: int
+) -> dict | None:
+    """Return goal config for a guild, or None if no goal is set.
+
+    Returns a dict with keys: amount_cents (int), milestones_sent (list[int]), month (str).
+    """
+    cursor = await db.execute(
+        "SELECT goal_amount, goal_milestones_sent, goal_month FROM guilds WHERE guild_id = ?",
+        (guild_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return {
+        "amount_cents": row[0],
+        "milestones_sent": json.loads(row[1]) if row[1] else [],
+        "month": row[2],
+    }
+
+
+async def set_goal_amount(
+    db: aiosqlite.Connection, guild_id: int, amount_cents: int
+) -> None:
+    """Set the monthly revenue goal. Resets milestone tracking."""
+    import datetime as _dt
+    current_month = _dt.date.today().strftime("%Y-%m")
+    await db.execute(
+        """
+        UPDATE guilds
+        SET goal_amount = ?, goal_milestones_sent = ?, goal_month = ?
+        WHERE guild_id = ?
+        """,
+        (amount_cents, json.dumps([]), current_month, guild_id),
+    )
+
+
+async def disable_goal(db: aiosqlite.Connection, guild_id: int) -> None:
+    await db.execute(
+        "UPDATE guilds SET goal_amount = NULL, goal_milestones_sent = NULL, goal_month = NULL WHERE guild_id = ?",
+        (guild_id,),
+    )
+
+
+async def update_goal_milestones(
+    db: aiosqlite.Connection, guild_id: int, milestones_sent: list[int], month: str
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET goal_milestones_sent = ?, goal_month = ? WHERE guild_id = ?",
+        (json.dumps(milestones_sent), month, guild_id),
+    )
+
+
+async def get_digest_config(
+    db: aiosqlite.Connection, guild_id: int
+) -> dict | None:
+    """Return digest config for a guild, or None if disabled.
+
+    Returns a dict with keys: time (str), tz (str), last_sent (int | None).
+    """
+    cursor = await db.execute(
+        "SELECT digest_time, digest_tz, digest_last_sent FROM guilds WHERE guild_id = ?",
+        (guild_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return {"time": row[0], "tz": row[1], "last_sent": row[2]}
+
+
+async def set_digest_config(
+    db: aiosqlite.Connection, guild_id: int, time_str: str, tz: str
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET digest_time = ?, digest_tz = ? WHERE guild_id = ?",
+        (time_str, tz, guild_id),
+    )
+
+
+async def disable_digest(db: aiosqlite.Connection, guild_id: int) -> None:
+    await db.execute(
+        "UPDATE guilds SET digest_time = NULL, digest_tz = NULL, digest_last_sent = NULL WHERE guild_id = ?",
+        (guild_id,),
+    )
+
+
+async def mark_digest_sent(db: aiosqlite.Connection, guild_id: int, sent_at: int) -> None:
+    await db.execute(
+        "UPDATE guilds SET digest_last_sent = ? WHERE guild_id = ?",
+        (sent_at, guild_id),
+    )
+
+
+async def get_receipts_due_within(
+    db: aiosqlite.Connection, shop_id: int, within_seconds: int, now: int
+) -> list:
+    """Return unshipped, non-canceled receipts with a ship deadline in the next within_seconds."""
+    deadline = now + within_seconds
+    cursor = await db.execute(
+        """
+        SELECT receipt_id, name, grandtotal_amount, grandtotal_divisor,
+               grandtotal_currency, expected_ship_date
+        FROM receipts
+        WHERE shop_id = ?
+          AND is_shipped = 0
+          AND LOWER(status) != 'canceled'
+          AND expected_ship_date IS NOT NULL
+          AND expected_ship_date <= ?
+        ORDER BY expected_ship_date ASC
+        """,
+        (shop_id, deadline),
+    )
+    return await cursor.fetchall()
+
+
+async def get_open_order_count(db: aiosqlite.Connection, shop_id: int) -> int:
+    """Return the number of open, unshipped, non-canceled receipts for a shop."""
+    cursor = await db.execute(
+        """
+        SELECT COUNT(*) FROM receipts
+        WHERE shop_id = ? AND is_shipped = 0 AND LOWER(status) != 'canceled'
+        """,
+        (shop_id,),
+    )
+    row = await cursor.fetchone()
+    return row[0] if row else 0
+
+
+async def get_backlog_config(
+    db: aiosqlite.Connection, guild_id: int
+) -> dict | None:
+    """Return backlog config for a guild, or None if the feature is disabled.
+
+    Returns a dict with keys: threshold (int), warned (bool).
+    """
+    cursor = await db.execute(
+        "SELECT backlog_threshold, backlog_warned FROM guilds WHERE guild_id = ?",
+        (guild_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return {"threshold": row[0], "warned": bool(row[1])}
+
+
+async def set_backlog_threshold(
+    db: aiosqlite.Connection, guild_id: int, threshold: int | None
+) -> None:
+    """Set the backlog threshold. Pass None to disable the feature."""
+    await db.execute(
+        "UPDATE guilds SET backlog_threshold = ?, backlog_warned = 0 WHERE guild_id = ?",
+        (threshold, guild_id),
+    )
+
+
+async def set_backlog_warned(
+    db: aiosqlite.Connection, guild_id: int, warned: bool
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET backlog_warned = ? WHERE guild_id = ?",
+        (1 if warned else 0, guild_id),
     )
 
 
