@@ -911,6 +911,10 @@ class ShopkeepBot(discord.Client):
         async def backlog_off(interaction: discord.Interaction):
             await self._cmd_backlog_off(interaction)
 
+        @backlog_group.command(name="status", description="Show the current backlog warning configuration")
+        async def backlog_status(interaction: discord.Interaction):
+            await self._cmd_backlog_status(interaction)
+
         tree.add_command(backlog_group)
 
         digest_group = discord.app_commands.Group(
@@ -934,6 +938,10 @@ class ShopkeepBot(discord.Client):
         @digest_group.command(name="off", description="Disable the daily digest")
         async def digest_off(interaction: discord.Interaction):
             await self._cmd_digest_off(interaction)
+
+        @digest_group.command(name="status", description="Show the current daily digest configuration")
+        async def digest_status(interaction: discord.Interaction):
+            await self._cmd_digest_status(interaction)
 
         tree.add_command(digest_group)
 
@@ -1000,9 +1008,11 @@ class ShopkeepBot(discord.Client):
             ("/reminders status", "Show the current shipping reminder configuration"),
             ("/backlog set <n>", "Alert when open unshipped orders exceed a threshold"),
             ("/backlog off", "Disable the order backlog warning"),
+            ("/backlog status", "Show the current backlog warning configuration"),
             ("/digest on", "Enable the daily digest (default: 9:00 AM UTC)"),
             ("/digest time", "Set the time and timezone for the daily digest"),
             ("/digest off", "Disable the daily digest"),
+            ("/digest status", "Show the current daily digest configuration"),
             ("/goal set <amount>", "Set a monthly revenue goal (notifies at 25/50/75/100%)"),
             ("/goal status", "Show current progress toward your monthly goal"),
             ("/goal off", "Remove the monthly revenue goal"),
@@ -1038,6 +1048,10 @@ class ShopkeepBot(discord.Client):
                     (guild_row["etsy_shop_id"],),
                 )
                 shop_row = await cursor.fetchone()
+            reminder_config = await db.get_guild_reminder_config(conn, interaction.guild_id)
+            backlog_config = await db.get_backlog_config(conn, interaction.guild_id)
+            digest_config = await db.get_digest_config(conn, interaction.guild_id)
+            goal_config = await db.get_goal_config(conn, interaction.guild_id)
 
         if not guild_row:
             await interaction.response.send_message(
@@ -1085,6 +1099,27 @@ class ShopkeepBot(discord.Client):
                 value=f"[Connect your Etsy shop]({WEB_BASE_URL}/connect/{token})",
                 inline=False,
             )
+
+        feature_lines = []
+        if reminder_config:
+            threshold_labels = {0: "today", 1: "tomorrow"}
+            day_labels = [threshold_labels.get(d, f"{d}d out") for d in reminder_config["days"]]
+            feature_lines.append(f"Reminders: {', '.join(day_labels)}")
+        else:
+            feature_lines.append("Reminders: off")
+        if backlog_config:
+            feature_lines.append(f"Backlog warning: ≥{backlog_config['threshold']} orders")
+        else:
+            feature_lines.append("Backlog warning: off")
+        if digest_config:
+            feature_lines.append(f"Daily digest: {digest_config['time']} {digest_config['tz']}")
+        else:
+            feature_lines.append("Daily digest: off")
+        if goal_config:
+            feature_lines.append(f"Monthly goal: ${goal_config['amount_cents'] // 100:,}")
+        else:
+            feature_lines.append("Monthly goal: off")
+        embed.add_field(name="Features", value="\n".join(feature_lines), inline=False)
 
         await interaction.response.send_message(embed=embed)
 
@@ -1396,6 +1431,7 @@ class ShopkeepBot(discord.Client):
                 return
             await db.set_guild_reminder_days(conn, interaction.guild_id, parsed)
             await conn.commit()
+            reminder_config = await db.get_guild_reminder_config(conn, interaction.guild_id)
 
         threshold_labels = {0: "Today", 1: "Tomorrow"}
         labels = [threshold_labels.get(d, f"{d} days out") for d in parsed]
@@ -1404,6 +1440,19 @@ class ShopkeepBot(discord.Client):
             description=f"You'll be notified when unshipped orders are due: **{', '.join(labels)}**.",
             color=discord.Color.green(),
         )
+        if reminder_config and reminder_config["time"] and reminder_config["tz"]:
+            try:
+                tz = zoneinfo.ZoneInfo(reminder_config["tz"])
+                abbr = datetime.datetime.now(tz).strftime("%Z")
+                embed.add_field(
+                    name="Fire time",
+                    value=f"{reminder_config['time']} {abbr} (`{reminder_config['tz']}`)",
+                    inline=False,
+                )
+            except Exception:
+                pass
+        else:
+            embed.add_field(name="Fire time", value="Any poll cycle — use `/reminders time` to pin a specific time.", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _autocomplete_timezone(
@@ -1508,7 +1557,6 @@ class ShopkeepBot(discord.Client):
 
         if config["time"] and config["tz"]:
             try:
-                import zoneinfo
                 tz = zoneinfo.ZoneInfo(config["tz"])
                 abbr = datetime.datetime.now(tz).strftime("%Z")
                 time_str = f"**{config['time']} {abbr}** (`{config['tz']}`)"
@@ -1564,6 +1612,23 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(
             "Backlog warning has been disabled.", ephemeral=True
         )
+
+    async def _cmd_backlog_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            config = await db.get_backlog_config(conn, interaction.guild_id)
+
+        if not config:
+            await interaction.response.send_message(
+                "Backlog warning is **disabled**. Use `/backlog set` to enable it.",
+                ephemeral=True,
+            )
+            return
+
+        embed = discord.Embed(title="Backlog Warning Status", color=discord.Color.blurple())
+        embed.add_field(name="Status", value="Enabled", inline=False)
+        embed.add_field(name="Threshold", value=f"{config['threshold']} open orders", inline=False)
+        embed.add_field(name="Currently warned", value="Yes" if config["warned"] else "No", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_digest_on(self, interaction: discord.Interaction) -> None:
         if not interaction.user.guild_permissions.manage_guild:
@@ -1635,6 +1700,31 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(
             "Daily digest has been disabled.", ephemeral=True
         )
+
+    async def _cmd_digest_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            config = await db.get_digest_config(conn, interaction.guild_id)
+
+        if not config:
+            await interaction.response.send_message(
+                "Daily digest is **disabled**. Use `/digest on` to enable it.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            tz = zoneinfo.ZoneInfo(config["tz"])
+            abbr = datetime.datetime.now(tz).strftime("%Z")
+            time_str = f"**{config['time']} {abbr}** (`{config['tz']}`)"
+        except Exception:
+            time_str = f"**{config['time']}** (`{config['tz']}`)"
+
+        embed = discord.Embed(title="Daily Digest Status", color=discord.Color.blurple())
+        embed.add_field(name="Status", value="Enabled", inline=False)
+        embed.add_field(name="Posts at", value=time_str, inline=False)
+        if config["last_sent"]:
+            embed.add_field(name="Last sent", value=f"<t:{config['last_sent']}:R>", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_goal_set(self, interaction: discord.Interaction, amount: int) -> None:
         if not interaction.user.guild_permissions.manage_guild:
