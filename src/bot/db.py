@@ -503,13 +503,17 @@ async def upsert_transactions(
         image = (t.get("listing_image") or {})
         image_url = image.get("url_75x75") or image.get("url_170x135")
         variations = t.get("selected_variations")
+        variations_json = json.dumps(variations) if variations is not None else None
         await db.execute(
             """
-            INSERT OR IGNORE INTO transactions (
+            INSERT INTO transactions (
                 transaction_id, receipt_id, shop_id, listing_id, title,
                 quantity, price_amount, price_divisor, price_currency,
                 create_timestamp, image_url, selected_variations, fetched_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(transaction_id) DO UPDATE SET
+                selected_variations = COALESCE(excluded.selected_variations, selected_variations),
+                image_url = COALESCE(excluded.image_url, image_url)
             """,
             (
                 t["transaction_id"],
@@ -523,7 +527,7 @@ async def upsert_transactions(
                 price.get("currency_code", "USD"),
                 t.get("create_timestamp", now),
                 image_url,
-                json.dumps(variations) if variations is not None else None,
+                variations_json,
                 now,
             ),
         )
