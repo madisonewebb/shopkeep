@@ -717,6 +717,31 @@ async def get_pending_reminders(
     return await cursor.fetchall()
 
 
+async def get_receipt_transactions(
+    db: aiosqlite.Connection,
+    receipt_id: int,
+) -> list[dict]:
+    """Return transactions for a receipt with selected_variations parsed from JSON."""
+    cursor = await db.execute(
+        "SELECT * FROM transactions WHERE receipt_id = ? ORDER BY transaction_id ASC",
+        (receipt_id,),
+    )
+    rows = await cursor.fetchall()
+    result = []
+    for row in rows:
+        d = dict(row)
+        raw = d.get("selected_variations")
+        if raw:
+            try:
+                d["selected_variations"] = json.loads(raw)
+            except Exception:
+                d["selected_variations"] = []
+        else:
+            d["selected_variations"] = []
+        result.append(d)
+    return result
+
+
 async def mark_reminder_sent(
     db: aiosqlite.Connection,
     receipt_id: int,
