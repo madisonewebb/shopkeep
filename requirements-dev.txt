@@ -1,7 +1,7 @@
-black==26.3.1
-ruff==0.15.9
-mypy==1.20.0
-pre-commit==4.5.1
-pytest==9.0.2
-pytest-asyncio==1.3.0
-pytest-mock==3.15.1
+git+https://github.com/psf/black.git@c6755bb741b6481d6b3d3bb563c83fa060db96c9#egg=black  # 26.3.1
+git+https://github.com/astral-sh/ruff.git@724ccc1ae8a61e872cf58435f2c073189dc248f2#egg=ruff  # 0.15.9
+git+https://github.com/python/mypy.git@770d3ca4997032dc3a1c4f0b468e9f58e8f38505#egg=mypy  # v1.20.0
+git+https://github.com/pre-commit/pre-commit.git@8a0630ca1aa7f6d5665effe674ebe2022af17919#egg=pre-commit  # v4.5.1
+git+https://github.com/pytest-dev/pytest.git@3d10b5148e03eb82b3ee29181dbdc73cf82699e2#egg=pytest  # 9.0.2
+git+https://github.com/pytest-dev/pytest-asyncio.git@2e9695fcf8c5c514f30f57b7d14ab83846357b96#egg=pytest-asyncio  # v1.3.0
+git+https://github.com/pytest-dev/pytest-mock.git@e1b5c62a38c5a05cae614aef3847f240ba50d269#egg=pytest-mock  # v3.15.1
