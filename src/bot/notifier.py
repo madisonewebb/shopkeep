@@ -296,6 +296,169 @@ def build_review_embed(review: dict, shop_name: str) -> discord.Embed:
     return embed
 
 
+def build_bestsellers_embed(
+    rows: list,
+    period_label: str,
+    ranked_by: str,
+    shop_name: str,
+) -> discord.Embed:
+    """Build a Discord embed for the /bestsellers command.
+
+    Args:
+        rows: DB rows with keys: title, units_sold, total_revenue, currency, image_url.
+        period_label: Human-readable period string, e.g. "March 2026" or "All Time".
+        ranked_by: "units" or "revenue".
+        shop_name: Shown in the footer.
+    """
+    rank_label = "units sold" if ranked_by == "units" else "revenue"
+    embed = discord.Embed(
+        title=f"Top Listings — {period_label}",
+        description=f"Ranked by {rank_label}",
+        color=discord.Color.gold(),
+    )
+
+    if not rows:
+        embed.description = f"No sales data found for {period_label}."
+        embed.set_footer(text=shop_name)
+        return embed
+
+    thumbnail_set = False
+    for i, row in enumerate(rows, start=1):
+        title = row["title"] or "Unknown"
+        units = row["units_sold"]
+        revenue = row["total_revenue"]
+        currency = row["currency"] or "USD"
+        value = f"{units} unit{'s' if units != 1 else ''} · ${revenue:.2f} {currency}"
+        embed.add_field(name=f"{i}. {title}", value=value, inline=False)
+        if not thumbnail_set and row["image_url"]:
+            embed.set_thumbnail(url=row["image_url"])
+            thumbnail_set = True
+
+    embed.set_footer(text=shop_name)
+    return embed
+
+
+def build_goal_milestone_embed(
+    milestone_pct: int,
+    current: float,
+    goal: float,
+    currency: str,
+    month_name: str,
+    days_left: int,
+    shop_name: str,
+) -> discord.Embed:
+    """Build a Discord embed for a revenue goal milestone notification."""
+    color = discord.Color.gold() if milestone_pct == 100 else discord.Color.green()
+    title = f"Goal Reached! 🎯" if milestone_pct == 100 else f"Goal Milestone: {milestone_pct}%"
+    embed = discord.Embed(
+        title=title,
+        description=(
+            f"You've made **${current:.2f}** of your **${goal:.2f}** {currency} {month_name} goal "
+            f"with **{days_left} day{'s' if days_left != 1 else ''}** to go."
+        ),
+        color=color,
+    )
+    embed.set_footer(text=shop_name)
+    return embed
+
+
+def build_digest_embed(
+    orders_24h: int,
+    revenue_24h: float,
+    currency: str,
+    open_count: int,
+    due_soon: list,
+    shop_name: str,
+    goal_amount: float | None = None,
+    goal_current: float | None = None,
+    goal_pct: int | None = None,
+) -> discord.Embed:
+    """Build the daily digest embed.
+
+    Args:
+        orders_24h: Number of orders received in the last 24 hours.
+        revenue_24h: Total revenue from those orders.
+        currency: Currency code for revenue display.
+        open_count: Total open unshipped orders.
+        due_soon: List of receipt dicts with keys: receipt_id, name, expected_ship_date.
+        shop_name: Human-readable shop name shown in the footer.
+    """
+    embed = discord.Embed(
+        title="Daily Digest",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now(timezone.utc),
+    )
+
+    embed.add_field(
+        name="Last 24 Hours",
+        value=f"{orders_24h} order{'s' if orders_24h != 1 else ''} · ${revenue_24h:.2f} {currency}",
+        inline=False,
+    )
+    embed.add_field(
+        name="Open Orders",
+        value=f"{open_count} waiting to ship",
+        inline=False,
+    )
+
+    if goal_amount is not None and goal_current is not None and goal_pct is not None:
+        embed.add_field(
+            name="Monthly Goal",
+            value=f"${goal_current:.2f} / ${goal_amount:.2f} {currency} — **{goal_pct}%**",
+            inline=False,
+        )
+
+    if due_soon:
+        lines = []
+        for r in due_soon:
+            buyer = r["name"] or "Unknown"
+            ship_ts = r["expected_ship_date"]
+            lines.append(f"• Order #{r['receipt_id']} — {buyer} — <t:{ship_ts}:D>")
+        embed.add_field(
+            name="Due to Ship Soon",
+            value="\n".join(lines),
+            inline=False,
+        )
+
+    embed.set_footer(text=shop_name)
+    return embed
+
+
+def build_backlog_embed(count: int, threshold: int, shop_name: str) -> discord.Embed:
+    """Build a Discord embed for an order backlog warning."""
+    embed = discord.Embed(
+        title="Order Backlog Warning",
+        description=(
+            f"You have **{count} open orders** waiting to ship, "
+            f"which has exceeded your threshold of {threshold}.\n\n"
+            "Use `/orders` to review pending orders."
+        ),
+        color=discord.Color.orange(),
+    )
+    embed.set_footer(text=shop_name)
+    return embed
+
+
+def build_out_of_stock_embed(listing: dict, shop_name: str) -> discord.Embed:
+    """Build a Discord embed for an out-of-stock listing notification."""
+    title = listing.get("title", "Unknown Listing")
+    url = listing.get("url")
+    embed = discord.Embed(
+        title="Out of Stock",
+        description=(
+            f"**[{title}]({url})**\n"
+            "This listing has sold out. Visit Etsy to restock or deactivate it."
+        ) if url else (
+            f"**{title}**\n"
+            "This listing has sold out. Visit Etsy to restock or deactivate it."
+        ),
+        color=discord.Color.red(),
+    )
+    if image_url := listing.get("image_url"):
+        embed.set_thumbnail(url=image_url)
+    embed.set_footer(text=shop_name)
+    return embed
+
+
 def build_shipping_reminder_embed(
     receipt: dict,
     shop_name: str,

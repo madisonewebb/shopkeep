@@ -24,80 +24,11 @@ Connect/disconnect confirmation embeds: Posts a confirmation to the order channe
 /preset - Save reusable shipping package configurations (weight, dimensions, carrier, mail class) per server; supports add, list, and remove subcommands
 Review notifications: Posts a notification when a new review is left; shows star rating and review text; existing reviews are marked seen on connect to avoid spam
 Repeat customer callout: New sale embeds show a 🔁 "Returning customer!" note when the buyer has ordered before; works from locally stored receipt history, no extra API calls
-
-
-PLANNED FEATURES
-
-4. Out-of-Stock Notifications
-
-What: Post a notification when a listing's quantity drops to zero.
-
-Details:
-- The bot already syncs listing quantities on each poll
-- Compares new quantity against the previously stored value; if it crosses zero, posts a notification
-- Notification shows listing title, thumbnail, and a direct link to the listing on Etsy
-
-Example:
-    Out of Stock: "Hand-painted Ceramic Mug"
-    Your listing has sold out. Visit Etsy to restock or deactivate it.
-
-
-5. Order Backlog Warning
-
-What: Post a warning when the number of open, unshipped orders exceeds a configurable threshold.
-
-Details:
-- Checked each poll cycle — no new API calls needed
-- Default threshold: 5 open orders; configurable per server
-- Warning fires once when the threshold is crossed, not on every poll, to avoid spam
-
-6. Daily Digest (/digest)
-
-What: Every morning at a configured time, the bot automatically posts a summary to the notification channel — n
-
-Details:
-- Orders received in the past 24 hours and their total revenue
-- Number of open orders currently waiting to ship
-- Any orders whose ship deadline is today or tomorrow
-- Configurable delivery time (default: 9:00 AM, timezone-aware)
-
-Configuration:
-    /digest on                 # enable with default time (9:00 AM)
-    /digest time 8:00      # set delivery time
-    /digest off                 # disable
-
-
-7. Revenue Goal Tracking (/goal)
-
-What: Set a monthly revenue target and receive milestone notifications as progress is made.
-
-Details:
-- Bot posts a notification when the shop hits 25%, 50%, 75%, and 100% of the monthly goal
-- Current progress also shown in the daily digest
-- Goal resets automatically at the start of each month
-
-Configuration:
-    /goal set 500      # set a $500 monthly revenue goal
-    /goal                   # show current progress
-    /goal off              # remove the goal
-
-Example:
-    Goal Milestone: 50%
-    You've made $250.00 of your $500.00 March goal with 18 days to go.
-
-
-8. /bestsellers - Top Listings by Sales
-
-What: Show the shop's top-performing listings by units sold or revenue over a time period.
-
-Details:
-- Computed from stored order data — no extra API calls
-- Options: this month, this year, all time
-- Shows listing title, units sold, and total revenue per item
-
-Example:
-    /bestsellers period:this_month
-    Top 5 listings ranked by units sold in March
+Out-of-stock notifications: Posts a notification when a listing's quantity drops to zero; listing quantities are synced every poll cycle; notification shows title, link, and thumbnail
+Order backlog warning: Posts a one-time warning when open unshipped orders exceed a configurable threshold; resets when backlog clears; configure with /backlog set <n> or /backlog off
+Daily digest: Posts a morning summary of 24hr orders + revenue, open order count, and upcoming ship deadlines; timezone-aware; configure with /digest on, /digest time, /digest off
+Revenue goal tracking: Set a monthly revenue target with /goal set; bot notifies at 25/50/75/100% milestones; progress shown in daily digest; resets automatically each month
+/bestsellers: Shows top 5 listings by units sold or revenue; supports this month / this year / all time; computed from stored transaction data
 
 
 STRETCH GOALS
@@ -163,13 +94,6 @@ Done:
 - Shipping deadline reminders (/reminders)
 - Review notifications (star rating, quoted review text, bootstrap deduplication)
 - /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset
-
-Planned:
-1.  Out-of-stock notifications
-3.  Order backlog warning
-4.  Daily digest (/digest)
-5.  Revenue goal tracking (/goal)
-6.  /bestsellers
 
 Stretch:
 S1. Shipping label printing (/printlabel)
