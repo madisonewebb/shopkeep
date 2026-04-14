@@ -3,6 +3,7 @@ import datetime
 import os
 import secrets
 import time
+import zoneinfo
 
 import discord
 from discord.ext import tasks
@@ -480,9 +481,24 @@ class ShopkeepBot(discord.Client):
         shop_name: str,
     ) -> None:
         """Post shipping deadline reminders for open orders approaching their ship date."""
-        reminder_days = await db.get_guild_reminder_days(conn, guild_id)
-        if not reminder_days or channel is None:
+        config = await db.get_guild_reminder_config(conn, guild_id)
+        if not config or channel is None:
             return
+
+        # If a time-of-day is configured, only fire during the poll window that contains it
+        if config["time"] and config["tz"]:
+            try:
+                tz = zoneinfo.ZoneInfo(config["tz"])
+            except zoneinfo.ZoneInfoNotFoundError:
+                tz = datetime.timezone.utc
+            now_local = datetime.datetime.now(tz)
+            h, m = map(int, config["time"].split(":"))
+            target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
+            diff = abs((now_local - target).total_seconds())
+            if diff > POLL_INTERVAL_SECS / 2:
+                return
+
+        reminder_days = config["days"]
         now = int(time.time())
         for days_before in reminder_days:
             pending = await db.get_pending_reminders(conn, shop_id, days_before, now)
@@ -630,6 +646,18 @@ class ShopkeepBot(discord.Client):
             await self._cmd_reminders_set(interaction, days=days)
 
         @reminders_group.command(
+            name="time",
+            description="Set the time of day reminders fire (default: any poll cycle)",
+        )
+        @discord.app_commands.describe(
+            time="Time in HH:MM format (24-hour), e.g. 09:00",
+            timezone="IANA timezone name, e.g. America/New_York or US/Pacific",
+        )
+        @discord.app_commands.autocomplete(timezone=self._autocomplete_timezone)
+        async def reminders_time(interaction: discord.Interaction, time: str, timezone: str):
+            await self._cmd_reminders_time(interaction, time=time, timezone=timezone)
+
+        @reminders_group.command(
             name="disable",
             description="Disable all shipping deadline reminders for this server",
         )
@@ -653,6 +681,7 @@ class ShopkeepBot(discord.Client):
             ("/preset list", "List all saved shipping presets"),
             ("/preset remove", "Delete a saved shipping preset"),
             ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
+            ("/reminders time", "Set the time of day reminders fire (e.g. 09:00 America/New_York)"),
             ("/reminders disable", "Disable all shipping deadline reminders"),
         ]
         for name, desc in commands:
@@ -1036,6 +1065,77 @@ class ShopkeepBot(discord.Client):
         embed = discord.Embed(
             title="Shipping Reminders Configured",
             description=f"You'll be notified when unshipped orders are due: **{', '.join(labels)}**.",
+            color=discord.Color.green(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _autocomplete_timezone(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[discord.app_commands.Choice[str]]:
+        current_lower = current.lower()
+        matches = [
+            tz for tz in sorted(zoneinfo.available_timezones())
+            if current_lower in tz.lower()
+        ]
+        # Prioritise common US/Canada zones at the top when query is empty or short
+        priority = [
+            "America/New_York", "America/Chicago", "America/Denver",
+            "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu",
+            "America/Toronto", "America/Vancouver", "Europe/London",
+            "Europe/Paris", "Australia/Sydney",
+        ]
+        ordered = [tz for tz in priority if current_lower in tz.lower()] + \
+                  [tz for tz in matches if tz not in priority]
+        return [
+            discord.app_commands.Choice(name=tz, value=tz)
+            for tz in ordered[:25]
+        ]
+
+    async def _cmd_reminders_time(
+        self, interaction: discord.Interaction, time: str, timezone: str
+    ) -> None:
+        if not interaction.user.guild_permissions.manage_guild:
+            await interaction.response.send_message(
+                "You need the **Manage Server** permission to use this.", ephemeral=True
+            )
+            return
+
+        # Validate time format
+        try:
+            h, m = time.split(":")
+            if not (0 <= int(h) <= 23 and 0 <= int(m) <= 59):
+                raise ValueError
+            time_str = f"{int(h):02d}:{int(m):02d}"
+        except (ValueError, AttributeError):
+            await interaction.response.send_message(
+                "Invalid time. Use HH:MM format, e.g. `09:00` or `14:30`.", ephemeral=True
+            )
+            return
+
+        # Validate timezone
+        try:
+            tz = zoneinfo.ZoneInfo(timezone)
+        except (zoneinfo.ZoneInfoNotFoundError, KeyError):
+            await interaction.response.send_message(
+                f"Unknown timezone `{timezone}`. Use an IANA name like `America/New_York` or `US/Pacific`.",
+                ephemeral=True,
+            )
+            return
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                await interaction.response.send_message(
+                    "No Etsy shop connected. Connect a shop first.", ephemeral=True
+                )
+                return
+            await db.set_guild_reminder_time(conn, interaction.guild_id, time_str, timezone)
+            await conn.commit()
+
+        now_local = datetime.datetime.now(tz).strftime("%Z")
+        embed = discord.Embed(
+            title="Reminder Time Set",
+            description=f"Shipping reminders will fire at **{time_str} {now_local}** (`{timezone}`).",
             color=discord.Color.green(),
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
