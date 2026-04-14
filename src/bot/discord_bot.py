@@ -457,11 +457,15 @@ class ShopkeepBot(discord.Client):
             for row in unnotified:
                 if channel:
                     raw = raw_by_id.get(row["receipt_id"], {})
+                    returning = await db.is_returning_buyer(
+                        conn, shop_id, row["buyer_user_id"], row["receipt_id"]
+                    )
                     embed = build_order_embed(
                         dict(row),
                         shop_name=shop_name,
                         new=True,
                         transactions=raw.get("transactions", []),
+                        returning=returning,
                     )
                     await channel.send(embed=embed)
                     await db.mark_receipt_notified(conn, row["receipt_id"])

@@ -786,6 +786,26 @@ async def mark_review_notified(db: aiosqlite.Connection, transaction_id: int) ->
     )
 
 
+async def is_returning_buyer(
+    db: aiosqlite.Connection,
+    shop_id: int,
+    buyer_user_id: int | None,
+    current_receipt_id: int,
+) -> bool:
+    """Return True if this buyer has any prior notified receipts for the shop."""
+    if not buyer_user_id:
+        return False
+    cursor = await db.execute(
+        """
+        SELECT 1 FROM receipts
+        WHERE shop_id = ? AND buyer_user_id = ? AND receipt_id != ? AND notified_at IS NOT NULL
+        LIMIT 1
+        """,
+        (shop_id, buyer_user_id, current_receipt_id),
+    )
+    return await cursor.fetchone() is not None
+
+
 async def disconnect_guild(
     db: aiosqlite.Connection, guild_id: int, new_setup_token: str, new_setup_token_exp: int
 ) -> None:

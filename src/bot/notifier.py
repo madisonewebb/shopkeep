@@ -169,6 +169,7 @@ def build_order_embed(
     shop_name: str,
     new: bool = False,
     transactions: list | None = None,
+    returning: bool = False,
 ) -> discord.Embed:
     """
     Build a Discord embed for an order notification.
@@ -208,7 +209,9 @@ def build_order_embed(
     if new:
         title = "🎉 New Sale!"
         buyer_line = f"**{buyer}** ordered [#{receipt_id}]({receipt_url}) — **{total}**"
-        description = f"{buyer_line}\n📍 {location}" if location else buyer_line
+        location_line = f"\n📍 {location}" if location else ""
+        returning_line = "\n🔁 Returning customer!" if returning else ""
+        description = f"{buyer_line}{location_line}{returning_line}"
     else:
         title = f"Order #{receipt_id}"
         description = f"**{buyer}** — {total}"
