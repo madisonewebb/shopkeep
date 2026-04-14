@@ -266,9 +266,10 @@ class ShopkeepBot(discord.Client):
             for row in guild_rows:
                 try:
                     await self._bootstrap_guild(row["guild_id"], row["etsy_shop_id"])
-                    self._bootstrapped_guilds.add(row["guild_id"])
                 except Exception as exc:
                     print(f"[bootstrap] guild={row['guild_id']} {exc}")
+                finally:
+                    self._bootstrapped_guilds.add(row["guild_id"])
             self.poll_orders.start()
 
     async def _register_existing_guilds(self) -> None:
@@ -378,7 +379,6 @@ class ShopkeepBot(discord.Client):
             if guild_id in self.etsy_clients and guild_id not in self._bootstrapped_guilds:
                 try:
                     shop_name = await self._bootstrap_guild(guild_id, row["etsy_shop_id"])
-                    self._bootstrapped_guilds.add(guild_id)
                     if shop_name:
                         if row["order_channel_id"]:
                             channel = self.get_channel(row["order_channel_id"])
@@ -393,6 +393,8 @@ class ShopkeepBot(discord.Client):
                                     pass
                 except Exception as exc:
                     print(f"[poller] bootstrap guild={guild_id} {exc}")
+                finally:
+                    self._bootstrapped_guilds.add(guild_id)
 
         await asyncio.gather(*(
             self._safe_poll_guild(row["guild_id"], row["etsy_shop_id"], row["order_channel_id"])
