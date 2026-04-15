@@ -708,7 +708,8 @@ async def get_pending_reminders(
     now: int,
 ) -> list:
     """Return unshipped receipts due within days_before days that haven't had this reminder sent."""
-    deadline = now + days_before * 86400
+    upper = now + days_before * 86400
+    lower = now + (days_before - 1) * 86400
     cursor = await db.execute(
         """
         SELECT r.*
@@ -716,6 +717,7 @@ async def get_pending_reminders(
         WHERE r.shop_id = ?
           AND r.is_shipped = 0
           AND r.expected_ship_date IS NOT NULL
+          AND r.expected_ship_date > ?
           AND r.expected_ship_date <= ?
           AND NOT EXISTS (
               SELECT 1 FROM shipping_reminders sr
@@ -724,7 +726,7 @@ async def get_pending_reminders(
           )
         ORDER BY r.expected_ship_date ASC
         """,
-        (shop_id, deadline, days_before),
+        (shop_id, lower, upper, days_before),
     )
     return await cursor.fetchall()
 
