@@ -714,9 +714,18 @@ class ShopkeepBot(discord.Client):
                 return
 
         reminder_days = config["days"]
-        now = int(time.time())
+        try:
+            reminder_tz = zoneinfo.ZoneInfo(config.get("tz") or "UTC")
+        except zoneinfo.ZoneInfoNotFoundError:
+            reminder_tz = datetime.timezone.utc
+        today_local = datetime.datetime.now(reminder_tz).date()
         for days_before in reminder_days:
-            pending = await db.get_pending_reminders(conn, shop_id, days_before, now)
+            target_date = today_local + datetime.timedelta(days=days_before)
+            day_start = datetime.datetime(target_date.year, target_date.month, target_date.day, tzinfo=reminder_tz)
+            day_end = day_start + datetime.timedelta(days=1)
+            lower = int(day_start.timestamp())
+            upper = int(day_end.timestamp())
+            pending = await db.get_pending_reminders(conn, shop_id, days_before, lower, upper)
             for row in pending:
                 txns = await db.get_receipt_transactions(conn, row["receipt_id"])
                 embed = build_shipping_reminder_embed(dict(row), shop_name, days_before, transactions=txns)
