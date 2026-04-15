@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="winter">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,28 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            sk: {
-              bg: '#07070f',
-              surface: '#0f0f1a',
-              s2: '#16162a',
-              s3: '#1e1e33',
-              border: '#252540',
-              brite: '#3b3b6e',
-              indigo: '#6366f1',
-              blue: '#3b82f6',
-              lindigo: '#a5b4fc',
-              lblue: '#93c5fd',
-              text: '#f0f0ff',
-              muted: '#8b8baf',
-              dim: '#4a4a72',
-            }
-          },
           fontFamily: {
             display: ['"Bricolage Grotesque"', 'sans-serif'],
             body: ['Figtree', 'sans-serif'],
@@ -38,136 +22,91 @@
       }
     }
   </script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #07070f;
-      background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
-      min-height: 100vh;
-    }
-    .main-nav {
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(7, 7, 15, 0.8);
-      border-bottom: 1px solid #252540;
-    }
-    .divider { height: 1px; background: #252540; }
-    .section-title {
-      font-family: 'Bricolage Grotesque', sans-serif;
-      font-weight: 600;
-      font-size: 0.8rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #a5b4fc;
-      margin-bottom: 0.6rem;
-    }
-    .prose-section { margin-bottom: 2rem; }
-    .prose-section p {
-      color: #8b8baf;
-      line-height: 1.75;
-      font-size: 0.95rem;
-      margin-bottom: 0.75rem;
-    }
-    .prose-section ul {
-      color: #8b8baf;
-      line-height: 1.75;
-      font-size: 0.95rem;
-      padding-left: 0;
-      list-style: none;
-    }
-    .prose-section ul li {
-      padding-left: 1rem;
-      position: relative;
-      margin-bottom: 0.35rem;
-    }
-    .prose-section ul li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0.55em;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #3b3b6e;
-    }
-  </style>
 </head>
-<body class="font-body text-sk-text antialiased">
+<body class="font-body antialiased">
 
-  <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
-      <div class="hidden md:flex items-center gap-1">
-        <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
-        <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
-        <a href="/about" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">About</a>
-        <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-text rounded-md">Privacy</a>
-        <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
-      </div>
+  <div class="navbar bg-base-100/90 backdrop-blur-lg border-b border-base-200 fixed top-0 z-50">
+    <div class="navbar-start px-4">
+      <a href="/" class="flex items-center gap-2">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-full">
+        <span class="font-display font-semibold text-base-content text-base tracking-tight">Shopkeep</span>
+      </a>
     </div>
-  </nav>
+    <div class="navbar-center hidden md:flex">
+      <ul class="menu menu-horizontal gap-0 text-sm px-1">
+        <li><a href="/" class="text-base-content/60 hover:text-base-content rounded-lg">Home</a></li>
+        <li><a href="/commands" class="text-base-content/60 hover:text-base-content rounded-lg">Commands</a></li>
+        <li><a href="/about" class="text-base-content/60 hover:text-base-content rounded-lg">About</a></li>
+        <li><a href="/privacy" class="font-medium text-base-content rounded-lg">Privacy</a></li>
+        <li><a href="/terms" class="text-base-content/60 hover:text-base-content rounded-lg">Terms</a></li>
+      </ul>
+    </div>
+    <div class="navbar-end px-4"></div>
+  </div>
 
   <main class="pt-28 pb-24 px-6">
     <div class="max-w-2xl mx-auto">
 
-      <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-4">Legal</p>
-      <h1 class="font-display font-bold text-4xl tracking-tight mb-2">Privacy Policy</h1>
-      <p class="text-sk-dim font-mono text-xs mb-12">Last updated: 2026</p>
+      <p class="font-mono text-xs text-base-content/40 tracking-widest uppercase mb-4">Legal</p>
+      <h1 class="font-display font-bold text-4xl tracking-tight mb-2 text-base-content">Privacy Policy</h1>
+      <p class="text-base-content/40 font-mono text-xs mb-12">Last updated: 2026</p>
 
-      <div class="divider mb-10"></div>
+      <div class="divider"></div>
 
-      <div class="prose-section">
-        <h2 class="section-title">What we collect</h2>
-        <p>Shopkeep collects and stores only the data required to deliver order notifications to your Discord server.</p>
-        <ul>
-          <li>Your Discord server (guild) ID and the notification channel you configure</li>
-          <li>Your Etsy shop ID</li>
-          <li>Etsy OAuth access and refresh tokens, used solely to read your orders</li>
-          <li>Order data from the Etsy API, including receipt IDs, timestamps, and item summaries</li>
-        </ul>
-      </div>
+      <div class="grid gap-8">
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">What we collect</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed mb-3">Shopkeep collects and stores only the data required to deliver order notifications to your Discord server.</p>
+          <ul class="text-sm text-base-content/60 leading-relaxed space-y-1.5 pl-4">
+            <li class="list-disc">Your Discord server (guild) ID and the notification channel you configure</li>
+            <li class="list-disc">Your Etsy shop ID</li>
+            <li class="list-disc">Etsy OAuth access and refresh tokens, used solely to read your orders</li>
+            <li class="list-disc">Order data from the Etsy API, including receipt IDs, timestamps, and item summaries</li>
+          </ul>
+        </div>
 
-      <div class="prose-section">
-        <h2 class="section-title">How we use it</h2>
-        <p>Your data is used for one purpose: polling your Etsy shop for new orders and posting notifications to your configured Discord channel.</p>
-        <p>Your data is not sold, shared with third parties, or used for advertising.</p>
-      </div>
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">How we use it</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed mb-2">Your data is used for one purpose: polling your Etsy shop for new orders and posting notifications to your configured Discord channel.</p>
+          <p class="text-sm text-base-content/60 leading-relaxed">Your data is not sold, shared with third parties, or used for advertising.</p>
+        </div>
 
-      <div class="prose-section">
-        <h2 class="section-title">Storage</h2>
-        <p>All data is stored in a SQLite database on the server running Shopkeep. Etsy OAuth tokens are used only to make authenticated API requests on your behalf.</p>
-      </div>
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">Storage</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed">All data is stored in a SQLite database on the server running Shopkeep. Etsy OAuth tokens are used only to make authenticated API requests on your behalf.</p>
+        </div>
 
-      <div class="prose-section">
-        <h2 class="section-title">Removing your data</h2>
-        <p>Removing Shopkeep from your Discord server stops all order polling immediately. To have your stored data deleted from our database, contact us and we will remove it promptly.</p>
-      </div>
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">Removing your data</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed">Removing Shopkeep from your Discord server stops all order polling immediately. To have your stored data deleted from our database, contact us and we will remove it promptly.</p>
+        </div>
 
-      <div class="prose-section">
-        <h2 class="section-title">Third-party services</h2>
-        <p>Shopkeep interacts with the Etsy API and the Discord API. Your use of those services is governed by their respective privacy policies.</p>
-      </div>
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">Third-party services</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed">Shopkeep interacts with the Etsy API and the Discord API. Your use of those services is governed by their respective privacy policies.</p>
+        </div>
 
-      <div class="prose-section">
-        <h2 class="section-title">Changes to this policy</h2>
-        <p>If this policy changes materially, we will update the date at the top of this page.</p>
+        <div>
+          <h2 class="font-display font-semibold text-xs tracking-widest uppercase text-primary mb-2">Changes to this policy</h2>
+          <p class="text-sm text-base-content/60 leading-relaxed">If this policy changes materially, we will update the date at the top of this page.</p>
+        </div>
       </div>
 
     </div>
   </main>
 
-  <footer class="border-t border-sk-border py-8 px-6">
+  <footer class="bg-base-200 border-t border-base-300 py-8 px-6">
     <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-      <span class="font-display font-semibold text-sm text-sk-dim">Shopkeep</span>
-      <div class="flex flex-wrap justify-center gap-6 text-sm text-sk-dim">
-        <a href="/" class="hover:text-sk-muted transition-colors">Home</a>
-        <a href="/commands" class="hover:text-sk-muted transition-colors">Commands</a>
-        <a href="/about" class="hover:text-sk-muted transition-colors">About</a>
-        <a href="/privacy" class="hover:text-sk-muted transition-colors">Privacy Policy</a>
-        <a href="/terms" class="hover:text-sk-muted transition-colors">Terms of Service</a>
+      <span class="font-display font-semibold text-sm text-base-content/40">Shopkeep</span>
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-base-content/40">
+        <a href="/" class="hover:text-base-content transition-colors">Home</a>
+        <a href="/commands" class="hover:text-base-content transition-colors">Commands</a>
+        <a href="/about" class="hover:text-base-content transition-colors">About</a>
+        <a href="/privacy" class="hover:text-base-content transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-base-content transition-colors">Terms of Service</a>
       </div>
     </div>
-    <p class="text-xs text-sk-dim font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
+    <p class="text-xs text-base-content/40 font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
   </footer>
 
 </body>
