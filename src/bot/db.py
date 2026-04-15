@@ -507,7 +507,7 @@ async def upsert_transactions(
         price = t.get("price") or {}
         image = (t.get("listing_image") or {})
         image_url = image.get("url_75x75") or image.get("url_170x135")
-        variations = t.get("selected_variations")
+        variations = t.get("selected_variations") or t.get("variations")
         variations_json = json.dumps(variations) if variations is not None else None
         personalization_msg = t.get("personalization_message") or None
         await db.execute(
@@ -705,11 +705,10 @@ async def get_pending_reminders(
     db: aiosqlite.Connection,
     shop_id: int,
     days_before: int,
-    now: int,
+    lower: int,
+    upper: int,
 ) -> list:
-    """Return unshipped receipts due within days_before days that haven't had this reminder sent."""
-    upper = now + days_before * 86400
-    lower = now + (days_before - 1) * 86400
+    """Return unshipped receipts whose ship date falls within [lower, upper) that haven't had this reminder sent."""
     cursor = await db.execute(
         """
         SELECT r.*
@@ -717,8 +716,8 @@ async def get_pending_reminders(
         WHERE r.shop_id = ?
           AND r.is_shipped = 0
           AND r.expected_ship_date IS NOT NULL
-          AND r.expected_ship_date > ?
-          AND r.expected_ship_date <= ?
+          AND r.expected_ship_date >= ?
+          AND r.expected_ship_date < ?
           AND NOT EXISTS (
               SELECT 1 FROM shipping_reminders sr
               WHERE sr.receipt_id = r.receipt_id

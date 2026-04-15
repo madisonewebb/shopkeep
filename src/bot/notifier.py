@@ -230,7 +230,7 @@ def build_order_embed(
                 continue
             qty = t.get("quantity", 1)
             line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
-            variations = t.get("selected_variations") or []
+            variations = t.get("selected_variations") or t.get("variations") or []
             if variations:
                 var_str = ", ".join(
                     f"{v['formatted_name']}: {v['formatted_value']}"
@@ -526,7 +526,7 @@ def build_shipping_reminder_embed(
                 continue
             qty = t.get("quantity", 1)
             line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
-            variations = t.get("selected_variations") or []
+            variations = t.get("selected_variations") or t.get("variations") or []
             if variations:
                 var_parts = []
                 for v in variations:
