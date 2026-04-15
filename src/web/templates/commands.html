@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="winter">
+<html lang="en" data-theme="shopkeep">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Commands - Shopkeep</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Nunito:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -15,7 +15,7 @@
         extend: {
           fontFamily: {
             display: ['"Bricolage Grotesque"', 'sans-serif'],
-            body: ['Figtree', 'sans-serif'],
+            body: ['Nunito', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace'],
           }
         }
@@ -23,12 +23,46 @@
     }
   </script>
   <style>
+    [data-theme="shopkeep"] {
+      color-scheme: light;
+      --p: oklch(0.50 0.13 292);
+      --pf: oklch(0.43 0.14 292);
+      --pc: oklch(0.97 0.01 292);
+      --s: oklch(0.71 0.10 22);
+      --sf: oklch(0.64 0.11 22);
+      --sc: oklch(0.97 0.01 22);
+      --a: oklch(0.54 0.18 355);
+      --af: oklch(0.47 0.18 355);
+      --ac: oklch(0.97 0.01 355);
+      --n: oklch(0.28 0.07 265);
+      --nf: oklch(0.23 0.07 265);
+      --nc: oklch(0.95 0.01 265);
+      --b1: oklch(0.98 0.008 55);
+      --b2: oklch(0.94 0.012 55);
+      --b3: oklch(0.90 0.016 55);
+      --bc: oklch(0.28 0.08 292);
+      --in: oklch(0.70 0.14 240);
+      --inc: oklch(0.97 0.01 240);
+      --su: oklch(0.72 0.13 152);
+      --suc: oklch(0.25 0.05 152);
+      --wa: oklch(0.80 0.14 72);
+      --wac: oklch(0.25 0.05 72);
+      --er: oklch(0.64 0.18 22);
+      --erc: oklch(0.97 0.01 22);
+      --rounded-box: 1.25rem;
+      --rounded-btn: 0.75rem;
+      --rounded-badge: 1.9rem;
+    }
+    body {
+      background-image: radial-gradient(ellipse 80% 50% at 70% -10%, oklch(0.71 0.10 22 / 0.18) 0%, transparent 55%),
+                        radial-gradient(ellipse 60% 40% at 10% 100%, oklch(0.50 0.13 292 / 0.10) 0%, transparent 50%);
+    }
     code { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
 <body class="font-body antialiased">
 
-  <div class="navbar bg-base-100/90 backdrop-blur-lg border-b border-base-200 fixed top-0 z-50">
+  <div class="navbar bg-base-100/85 backdrop-blur-lg border-b border-base-300 fixed top-0 z-50">
     <div class="navbar-start px-4">
       <a href="/" class="flex items-center gap-2">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-full">
@@ -36,12 +70,12 @@
       </a>
     </div>
     <div class="navbar-center hidden md:flex">
-      <ul class="menu menu-horizontal gap-0 text-sm px-1">
-        <li><a href="/" class="text-base-content/60 hover:text-base-content rounded-lg">Home</a></li>
-        <li><a href="/commands" class="font-medium text-base-content rounded-lg">Commands</a></li>
-        <li><a href="/about" class="text-base-content/60 hover:text-base-content rounded-lg">About</a></li>
-        <li><a href="/privacy" class="text-base-content/60 hover:text-base-content rounded-lg">Privacy</a></li>
-        <li><a href="/terms" class="text-base-content/60 hover:text-base-content rounded-lg">Terms</a></li>
+      <ul class="menu menu-horizontal gap-0 text-sm px-1 font-semibold">
+        <li><a href="/" class="text-base-content/50 hover:text-base-content rounded-lg">Home</a></li>
+        <li><a href="/commands" class="text-base-content rounded-lg">Commands</a></li>
+        <li><a href="/about" class="text-base-content/50 hover:text-base-content rounded-lg">About</a></li>
+        <li><a href="/privacy" class="text-base-content/50 hover:text-base-content rounded-lg">Privacy</a></li>
+        <li><a href="/terms" class="text-base-content/50 hover:text-base-content rounded-lg">Terms</a></li>
       </ul>
     </div>
     <div class="navbar-end px-4"></div>
@@ -50,73 +84,73 @@
   <main class="pt-28 pb-24 px-6">
     <div class="max-w-2xl mx-auto">
 
-      <p class="font-mono text-xs text-base-content/40 tracking-widest uppercase mb-4">Reference</p>
+      <p class="font-mono text-xs text-primary/60 tracking-widest uppercase mb-4 font-semibold">Reference</p>
       <h1 class="font-display font-bold text-4xl tracking-tight mb-3 text-base-content">Commands</h1>
-      <p class="text-base-content/60 mb-12">All slash commands available in any Discord server with Shopkeep installed.</p>
+      <p class="text-base-content/60 mb-12 font-medium">All slash commands available in any Discord server with Shopkeep installed.</p>
 
-      <div class="divider"></div>
+      <div class="divider opacity-50"></div>
 
       <div class="grid gap-3">
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/setchannel</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Set the Discord channel where new order notifications will be posted. Run this in the channel you want to use. Requires Manage Channels permission.</p>
+            <code class="text-primary text-sm font-semibold">/setchannel</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Set the Discord channel where new order notifications will be posted. Run this in the channel you want to use. Requires Manage Channels permission.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/status</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Show the Etsy shop connected to this server and which channel is set for order notifications.</p>
+            <code class="text-primary text-sm font-semibold">/status</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Show the Etsy shop connected to this server and which channel is set for order notifications.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/shop</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Display information about the Etsy shop connected to this server, including shop name, ID, and connection status.</p>
+            <code class="text-primary text-sm font-semibold">/shop</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Display information about the Etsy shop connected to this server, including shop name, ID, and connection status.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/orders [days] [status]</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">List orders from your connected Etsy shop. Defaults to the last 30 days, open orders only. Filter by status: open, completed, canceled, or all.</p>
+            <code class="text-primary text-sm font-semibold">/orders [days] [status]</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">List orders from your connected Etsy shop. Defaults to the last 30 days, open orders only. Filter by status: open, completed, canceled, or all.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/revenue [period]</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Show a revenue summary for a time period — today, this week, or this month (default).</p>
+            <code class="text-primary text-sm font-semibold">/revenue [period]</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Show a revenue summary for a time period — today, this week, or this month (default).</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/listings</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Browse your active Etsy listings.</p>
+            <code class="text-primary text-sm font-semibold">/listings</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Browse your active Etsy listings.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/disconnect</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Unlink your Etsy shop from this server.</p>
+            <code class="text-primary text-sm font-semibold">/disconnect</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Unlink your Etsy shop from this server.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/help</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">List all Shopkeep commands.</p>
+            <code class="text-primary text-sm font-semibold">/help</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">List all Shopkeep commands.</p>
           </div>
         </div>
 
-        <div class="card bg-base-100 border border-base-200 hover:border-base-300 transition-colors">
+        <div class="card bg-base-100 border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all">
           <div class="card-body py-4 px-5 gap-2">
-            <code class="text-primary text-sm font-medium">/preset add · /preset list · /preset remove</code>
-            <p class="text-sm text-base-content/60 leading-relaxed">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when printing labels. Use <code class="text-primary">/preset list</code> to view all saved presets and <code class="text-primary">/preset remove</code> to delete one.</p>
+            <code class="text-primary text-sm font-semibold">/preset add · /preset list · /preset remove</code>
+            <p class="text-sm text-base-content/60 leading-relaxed font-medium">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when printing labels. Use <code class="text-primary">/preset list</code> to view all saved presets and <code class="text-primary">/preset remove</code> to delete one.</p>
           </div>
         </div>
       </div>
@@ -126,7 +160,7 @@
   <footer class="bg-base-200 border-t border-base-300 py-8 px-6">
     <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
       <span class="font-display font-semibold text-sm text-base-content/40">Shopkeep</span>
-      <div class="flex flex-wrap justify-center gap-6 text-sm text-base-content/40">
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-base-content/40 font-semibold">
         <a href="/" class="hover:text-base-content transition-colors">Home</a>
         <a href="/commands" class="hover:text-base-content transition-colors">Commands</a>
         <a href="/about" class="hover:text-base-content transition-colors">About</a>
@@ -134,7 +168,7 @@
         <a href="/terms" class="hover:text-base-content transition-colors">Terms of Service</a>
       </div>
     </div>
-    <p class="text-xs text-base-content/40 font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
+    <p class="text-xs text-base-content/35 font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
   </footer>
 
 </body>
