@@ -168,8 +168,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     price_currency      TEXT    NOT NULL DEFAULT 'USD',
     create_timestamp    INTEGER NOT NULL,
     image_url           TEXT,
-    selected_variations TEXT,
-    fetched_at          INTEGER NOT NULL
+    selected_variations  TEXT,
+    personalization_msg  TEXT,
+    fetched_at           INTEGER NOT NULL
 )
 """
 
@@ -260,6 +261,10 @@ async def init_db() -> None:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE transactions ADD COLUMN selected_variations TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE transactions ADD COLUMN personalization_msg TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -504,15 +509,17 @@ async def upsert_transactions(
         image_url = image.get("url_75x75") or image.get("url_170x135")
         variations = t.get("selected_variations")
         variations_json = json.dumps(variations) if variations is not None else None
+        personalization_msg = t.get("personalization_message") or None
         await db.execute(
             """
             INSERT INTO transactions (
                 transaction_id, receipt_id, shop_id, listing_id, title,
                 quantity, price_amount, price_divisor, price_currency,
-                create_timestamp, image_url, selected_variations, fetched_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                create_timestamp, image_url, selected_variations, personalization_msg, fetched_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(transaction_id) DO UPDATE SET
                 selected_variations = COALESCE(excluded.selected_variations, selected_variations),
+                personalization_msg = COALESCE(excluded.personalization_msg, personalization_msg),
                 image_url = COALESCE(excluded.image_url, image_url)
             """,
             (
@@ -528,6 +535,7 @@ async def upsert_transactions(
                 t.get("create_timestamp", now),
                 image_url,
                 variations_json,
+                personalization_msg,
                 now,
             ),
         )

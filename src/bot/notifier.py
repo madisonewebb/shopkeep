@@ -239,6 +239,8 @@ def build_order_embed(
                 )
                 if var_str:
                     line += f"\n  *{var_str}*"
+            if msg := t.get("personalization_msg"):
+                line += f"\n  📝 ||{msg}||"
             item_lines.append(line)
         if item_lines:
             embed.add_field(name="Items", value="\n".join(item_lines), inline=False)
@@ -539,6 +541,8 @@ def build_shipping_reminder_embed(
                         var_parts.append(f"{v['formatted_name']}: {value}")
                 if var_parts:
                     line += "\n  " + ", ".join(var_parts)
+            if msg := t.get("personalization_msg"):
+                line += f"\n  📝 ||{msg}||"
             item_lines.append(line)
             if thumbnail_url is None and t.get("image_url"):
                 thumbnail_url = t["image_url"]
