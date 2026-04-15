@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="winter">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,28 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            sk: {
-              bg: '#07070f',
-              surface: '#0f0f1a',
-              s2: '#16162a',
-              s3: '#1e1e33',
-              border: '#252540',
-              brite: '#3b3b6e',
-              indigo: '#6366f1',
-              blue: '#3b82f6',
-              lindigo: '#a5b4fc',
-              lblue: '#93c5fd',
-              text: '#f0f0ff',
-              muted: '#8b8baf',
-              dim: '#4a4a72',
-            }
-          },
           fontFamily: {
             display: ['"Bricolage Grotesque"', 'sans-serif'],
             body: ['Figtree', 'sans-serif'],
@@ -38,77 +22,42 @@
       }
     }
   </script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #07070f;
-      background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
-      min-height: 100vh;
-    }
-    .main-nav {
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(7, 7, 15, 0.8);
-      border-bottom: 1px solid #252540;
-    }
-    .btn-primary {
-      background: #6366f1;
-      border: 1px solid rgba(165, 180, 252, 0.2);
-      transition: all 0.15s ease;
-      display: inline-block;
-    }
-    .btn-primary:hover {
-      background: #818cf8;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
-    }
-    .divider { height: 1px; background: #252540; }
-    .tech-pill {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      color: #8b8baf;
-      background: #16162a;
-      border: 1px solid #252540;
-      padding: 0.2rem 0.65rem;
-      border-radius: 999px;
-      display: inline-block;
-    }
-    .prose p {
-      color: #8b8baf;
-      line-height: 1.75;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
-  </style>
 </head>
-<body class="font-body text-sk-text antialiased">
+<body class="font-body antialiased">
 
-  <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
-      <div class="hidden md:flex items-center gap-1">
-        <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
-        <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
-        <a href="/about" class="px-3 py-1.5 text-sm text-sk-text rounded-md">About</a>
-        <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
-        <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
-      </div>
+  <div class="navbar bg-base-100/90 backdrop-blur-lg border-b border-base-200 fixed top-0 z-50">
+    <div class="navbar-start px-4">
+      <a href="/" class="flex items-center gap-2">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-full">
+        <span class="font-display font-semibold text-base-content text-base tracking-tight">Shopkeep</span>
+      </a>
     </div>
-  </nav>
+    <div class="navbar-center hidden md:flex">
+      <ul class="menu menu-horizontal gap-0 text-sm px-1">
+        <li><a href="/" class="text-base-content/60 hover:text-base-content rounded-lg">Home</a></li>
+        <li><a href="/commands" class="text-base-content/60 hover:text-base-content rounded-lg">Commands</a></li>
+        <li><a href="/about" class="font-medium text-base-content rounded-lg">About</a></li>
+        <li><a href="/privacy" class="text-base-content/60 hover:text-base-content rounded-lg">Privacy</a></li>
+        <li><a href="/terms" class="text-base-content/60 hover:text-base-content rounded-lg">Terms</a></li>
+      </ul>
+    </div>
+    <div class="navbar-end px-4"></div>
+  </div>
 
   <main class="pt-28 pb-24 px-6">
     <div class="max-w-2xl mx-auto">
 
-      <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-4">About</p>
-      <h1 class="font-display font-bold text-4xl tracking-tight mb-3">Built for Etsy sellers</h1>
-      <p class="text-sk-muted mb-12">A small tool that solves a specific problem.</p>
+      <p class="font-mono text-xs text-base-content/40 tracking-widest uppercase mb-4">About</p>
+      <h1 class="font-display font-bold text-4xl tracking-tight mb-3 text-base-content">Built for Etsy sellers</h1>
+      <p class="text-base-content/60 mb-12">A small tool that solves a specific problem.</p>
 
-      <div class="divider mb-10"></div>
+      <div class="divider"></div>
 
-      <div class="prose mb-10">
-        <p>
+      <div class="prose prose-sm max-w-none mb-10 text-base-content/60 leading-relaxed">
+        <p class="mb-4">
           Shopkeep started as a simple utility for Etsy sellers who wanted real-time order alerts without constantly checking their phone or email. Discord is already where many small businesses gather with their teams, so connecting the two felt natural.
         </p>
-        <p>
+        <p class="mb-4">
           Add the bot to your server, authorize your Etsy account through a secure OAuth flow, and pick the channel where you want notifications. After that, Shopkeep runs in the background. New orders show up as rich embeds the moment they come in.
         </p>
         <p>
@@ -116,34 +65,34 @@
         </p>
       </div>
 
-      <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-4">Built with</p>
+      <p class="font-mono text-xs text-base-content/40 tracking-widest uppercase mb-4">Built with</p>
       <div class="flex flex-wrap gap-2 mb-12">
-        <span class="tech-pill">Python</span>
-        <span class="tech-pill">discord.py</span>
-        <span class="tech-pill">Etsy API v3</span>
-        <span class="tech-pill">Flask</span>
-        <span class="tech-pill">aiosqlite</span>
+        <span class="badge badge-ghost font-mono text-xs">Python</span>
+        <span class="badge badge-ghost font-mono text-xs">discord.py</span>
+        <span class="badge badge-ghost font-mono text-xs">Etsy API v3</span>
+        <span class="badge badge-ghost font-mono text-xs">Flask</span>
+        <span class="badge badge-ghost font-mono text-xs">aiosqlite</span>
       </div>
 
-      <div class="divider mb-10"></div>
+      <div class="divider"></div>
 
-      <a href="/" class="btn-primary font-semibold text-white px-6 py-2.5 rounded-lg text-sm">Add to Discord</a>
+      <a href="/" class="btn btn-primary">Add to Discord</a>
 
     </div>
   </main>
 
-  <footer class="border-t border-sk-border py-8 px-6">
+  <footer class="bg-base-200 border-t border-base-300 py-8 px-6">
     <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-      <span class="font-display font-semibold text-sm text-sk-dim">Shopkeep</span>
-      <div class="flex flex-wrap justify-center gap-6 text-sm text-sk-dim">
-        <a href="/" class="hover:text-sk-muted transition-colors">Home</a>
-        <a href="/commands" class="hover:text-sk-muted transition-colors">Commands</a>
-        <a href="/about" class="hover:text-sk-muted transition-colors">About</a>
-        <a href="/privacy" class="hover:text-sk-muted transition-colors">Privacy Policy</a>
-        <a href="/terms" class="hover:text-sk-muted transition-colors">Terms of Service</a>
+      <span class="font-display font-semibold text-sm text-base-content/40">Shopkeep</span>
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-base-content/40">
+        <a href="/" class="hover:text-base-content transition-colors">Home</a>
+        <a href="/commands" class="hover:text-base-content transition-colors">Commands</a>
+        <a href="/about" class="hover:text-base-content transition-colors">About</a>
+        <a href="/privacy" class="hover:text-base-content transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-base-content transition-colors">Terms of Service</a>
       </div>
     </div>
-    <p class="text-xs text-sk-dim font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
+    <p class="text-xs text-base-content/40 font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
   </footer>
 
 </body>

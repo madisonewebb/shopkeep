@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="winter">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,28 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            sk: {
-              bg: '#07070f',
-              surface: '#0f0f1a',
-              s2: '#16162a',
-              s3: '#1e1e33',
-              border: '#252540',
-              brite: '#3b3b6e',
-              indigo: '#6366f1',
-              blue: '#3b82f6',
-              lindigo: '#a5b4fc',
-              lblue: '#93c5fd',
-              text: '#f0f0ff',
-              muted: '#8b8baf',
-              dim: '#4a4a72',
-            }
-          },
           fontFamily: {
             display: ['"Bricolage Grotesque"', 'sans-serif'],
             body: ['Figtree', 'sans-serif'],
@@ -38,55 +22,31 @@
       }
     }
   </script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #07070f;
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(239, 68, 68, 0.08) 0%, transparent 60%);
-      min-height: 100vh;
-    }
-    .card {
-      background: #0f0f1a;
-      border: 1px solid #252540;
-      border-radius: 16px;
-    }
-    .error-dot {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .back-link {
-      color: #8b8baf;
-      font-size: 0.875rem;
-      transition: color 0.15s;
-    }
-    .back-link:hover { color: #f0f0ff; }
-  </style>
 </head>
-<body class="font-body text-sk-text antialiased">
+<body class="font-body antialiased">
 
   <div class="min-h-screen flex flex-col">
-    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
-      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+    <header class="h-14 flex items-center justify-center px-6 border-b border-base-200 bg-base-100">
+      <a href="/" class="flex items-center gap-2">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-full">
+        <span class="font-display font-semibold text-base-content text-base tracking-tight">Shopkeep</span>
+      </a>
     </header>
 
     <main class="flex-1 flex items-center justify-center px-6 py-16">
-      <div class="card w-full max-w-sm p-8">
-        <div class="error-dot mb-6">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 5V8.5" stroke="#f87171" stroke-width="1.75" stroke-linecap="round"/>
-            <circle cx="8" cy="11.5" r="1" fill="#f87171"/>
-          </svg>
+      <div class="card bg-base-100 shadow-md w-full max-w-sm">
+        <div class="card-body gap-4">
+          <div class="w-9 h-9 rounded-full bg-error/8 border border-error/20 flex items-center justify-center">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 5V8.5" stroke="oklch(var(--er))" stroke-width="1.75" stroke-linecap="round"/>
+              <circle cx="8" cy="11.5" r="1" fill="oklch(var(--er))"/>
+            </svg>
+          </div>
+          <p class="font-mono text-xs text-base-content/40 tracking-widest uppercase">Error</p>
+          <h1 class="font-display font-bold text-2xl tracking-tight text-base-content">Something went wrong</h1>
+          <p class="text-sm text-base-content/60 leading-relaxed">{{ message }}</p>
+          <a href="/" class="text-sm text-base-content/50 hover:text-base-content transition-colors mt-2">&larr; Back to home</a>
         </div>
-        <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-3">Error</p>
-        <h1 class="font-display font-bold text-2xl tracking-tight mb-3">Something went wrong</h1>
-        <p class="text-sm text-sk-muted leading-relaxed mb-7">{{ message }}</p>
-        <a href="/" class="back-link">&larr; Back to home</a>
       </div>
     </main>
   </div>
