@@ -22,6 +22,7 @@
           <li><a href="/">Home</a></li>
           <li><a href="/commands">Commands</a></li>
           <li><a href="/about">About</a></li>
+          <li><a href="/changelog">Changelog</a></li>
           <li><a href="/privacy">Privacy</a></li>
           <li><a href="/terms">Terms</a></li>
         </ul>
@@ -36,6 +37,7 @@
         <li><a href="/" class="rounded-lg">Home</a></li>
         <li><a href="/commands" class="text-base-content/50 hover:text-base-content rounded-lg">Commands</a></li>
         <li><a href="/about" class="text-base-content/50 hover:text-base-content rounded-lg">About</a></li>
+        <li><a href="/changelog" class="text-base-content/50 hover:text-base-content rounded-lg">Changelog</a></li>
         <li><a href="/privacy" class="text-base-content/50 hover:text-base-content rounded-lg">Privacy</a></li>
         <li><a href="/terms" class="text-base-content/50 hover:text-base-content rounded-lg">Terms</a></li>
       </ul>
@@ -66,6 +68,7 @@
             <a href="{{ invite_url }}" class="btn btn-primary">Add to Discord</a>
             <a href="/commands" class="btn btn-outline">View commands</a>
           </div>
+          <p class="text-xs text-base-content/40 font-semibold mt-4 tracking-wide">Free forever &middot; No credit card required</p>
         </div>
 
         <!-- Discord embed mockup -->
@@ -99,6 +102,158 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-20 px-6 bg-base-200">
+      <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-12">
+          <span class="badge badge-primary font-bold px-4 py-3 h-auto text-sm whitespace-nowrap">Features</span>
+          <p class="text-base-content/60 text-sm leading-relaxed">Everything you need to stay on top of your shop, right in Discord.</p>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Instant order alerts</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">Shopkeep polls your shop every 60 seconds and posts a rich notification the moment a new order comes in.</p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Revenue summaries</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">Run <code class="bg-base-200 px-1 rounded text-xs">/revenue</code> to get today's, this week's, or this month's totals and order count.</p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center text-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Shipping reminders</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">Get automatic reminders for orders approaching their ship-by date, color-coded by urgency.</p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Order management</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">Browse recent orders, filter by status, and view listing details — all without leaving Discord.</p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Read-only &amp; secure</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">Shopkeep only requests read access. It can never modify your Etsy shop, listings, or account.</p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 border border-base-300">
+            <div class="card-body gap-3">
+              <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center text-info">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+              </div>
+              <h3 class="font-display font-bold text-base text-base-content">Free forever</h3>
+              <p class="text-sm text-base-content/60 leading-relaxed">No plans, no limits, no credit card. Shopkeep is free to use for any Discord server.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- In action -->
+    <section class="py-20 px-6">
+      <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-12">
+          <span class="badge badge-primary font-bold px-4 py-3 h-auto text-sm whitespace-nowrap">In action</span>
+          <p class="text-base-content/60 text-sm leading-relaxed">A few things Shopkeep posts directly to your Discord channel.</p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+
+          <!-- Order notification -->
+          <div class="bg-neutral text-neutral-content rounded-2xl p-5 shadow-md flex flex-col gap-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-neutral-content/10">
+              <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-primary-content text-xs flex-shrink-0">S</div>
+              <span class="font-bold text-sm">Shopkeep</span>
+              <span class="badge badge-primary badge-xs font-bold">BOT</span>
+            </div>
+            <div class="border-l-4 border-primary pl-3 space-y-2">
+              <p class="font-bold text-primary text-xs">🛍️ New Order — #1042</p>
+              <p class="text-xs text-neutral-content/75">Handmade Ceramic Mug × 2</p>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-1">
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Customer</p><p class="font-semibold">Jane D.</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Total</p><p class="font-semibold text-success">$42.00</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Status</p><p class="font-semibold">Open</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Ships to</p><p class="font-semibold">Portland, OR</p></div>
+              </div>
+            </div>
+            <p class="text-[10px] text-neutral-content/30 font-mono mt-auto">New order notification</p>
+          </div>
+
+          <!-- Revenue summary -->
+          <div class="bg-neutral text-neutral-content rounded-2xl p-5 shadow-md flex flex-col gap-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-neutral-content/10">
+              <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-primary-content text-xs flex-shrink-0">S</div>
+              <span class="font-bold text-sm">Shopkeep</span>
+              <span class="badge badge-primary badge-xs font-bold">BOT</span>
+            </div>
+            <div class="border-l-4 border-success pl-3 space-y-2">
+              <p class="font-bold text-success text-xs">📊 Revenue — This Month</p>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-1">
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Revenue</p><p class="font-semibold text-success">$1,284.50</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Orders</p><p class="font-semibold">23</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Avg. order</p><p class="font-semibold">$55.85</p></div>
+                <div><p class="text-neutral-content/40 uppercase tracking-wide text-[10px] mb-0.5">Top item</p><p class="font-semibold">Ceramic Mug</p></div>
+              </div>
+            </div>
+            <p class="text-[10px] text-neutral-content/30 font-mono mt-auto">/revenue this-month</p>
+          </div>
+
+          <!-- Shipping reminder -->
+          <div class="bg-neutral text-neutral-content rounded-2xl p-5 shadow-md flex flex-col gap-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-neutral-content/10">
+              <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-primary-content text-xs flex-shrink-0">S</div>
+              <span class="font-bold text-sm">Shopkeep</span>
+              <span class="badge badge-primary badge-xs font-bold">BOT</span>
+            </div>
+            <div class="space-y-2">
+              <p class="font-bold text-warning text-xs">📦 Shipping Reminders</p>
+              <div class="space-y-1.5 text-xs">
+                <div class="flex items-center justify-between bg-error/15 rounded-lg px-2.5 py-1.5">
+                  <span class="font-semibold">#1038 Wool Scarf</span>
+                  <span class="text-error font-bold text-[10px]">Due today</span>
+                </div>
+                <div class="flex items-center justify-between bg-warning/15 rounded-lg px-2.5 py-1.5">
+                  <span class="font-semibold">#1039 Mug Set × 3</span>
+                  <span class="text-warning font-bold text-[10px]">1 day left</span>
+                </div>
+                <div class="flex items-center justify-between bg-success/10 rounded-lg px-2.5 py-1.5">
+                  <span class="font-semibold">#1041 Pottery Bowl</span>
+                  <span class="text-success font-bold text-[10px]">3 days left</span>
+                </div>
+              </div>
+            </div>
+            <p class="text-[10px] text-neutral-content/30 font-mono mt-auto">Daily shipping reminder</p>
+          </div>
+
         </div>
       </div>
     </section>
@@ -157,6 +312,68 @@
       </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="py-20 px-6">
+      <div class="max-w-3xl mx-auto">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-12">
+          <span class="badge badge-primary font-bold px-4 py-3 h-auto text-sm whitespace-nowrap">FAQ</span>
+          <p class="text-base-content/60 text-sm leading-relaxed">Common questions about Shopkeep.</p>
+        </div>
+        <div class="flex flex-col gap-2">
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" checked />
+            <div class="collapse-title font-semibold text-base-content">Is Shopkeep really free?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Yes, completely free. No plans, no limits, no credit card required — ever. Shopkeep is a passion project built for Etsy sellers.</div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" />
+            <div class="collapse-title font-semibold text-base-content">How quickly does it detect new orders?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Shopkeep checks your Etsy shop every 60 seconds, so you'll see a notification within a minute of a new order being placed.</div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" />
+            <div class="collapse-title font-semibold text-base-content">Can I use it with multiple Etsy shops?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Each Discord server connects to one Etsy shop. If you have multiple shops, just add Shopkeep to multiple Discord servers — one per shop.</div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" />
+            <div class="collapse-title font-semibold text-base-content">What Etsy permissions does it request?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Read-only access to your transactions, listings, and shop profile. Shopkeep can never modify your Etsy shop, post listings, or make any changes to your account.</div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" />
+            <div class="collapse-title font-semibold text-base-content">Who can configure the bot in my server?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Setup requires server ownership (the initial connect link is sent to the owner). After that, anyone with the Manage Channels permission can run <code class="bg-base-200 px-1 rounded">/setchannel</code> to change where notifications go.</div>
+          </div>
+
+          <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="radio" name="faq" />
+            <div class="collapse-title font-semibold text-base-content">What if my Etsy token expires?</div>
+            <div class="collapse-content text-sm text-base-content/60 leading-relaxed">Shopkeep handles token refresh automatically in the background. If it ever can't refresh, it'll post a message in your notifications channel with a re-auth link so you never miss an order.</div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="py-20 px-6 bg-primary text-primary-content">
+      <div class="max-w-2xl mx-auto text-center">
+        <p class="text-primary-content/60 text-sm font-semibold mb-3 tracking-wide uppercase">Free forever</p>
+        <h2 class="font-display font-extrabold text-4xl md:text-5xl tracking-tight mb-5">Ready to stop missing orders?</h2>
+        <p class="text-primary-content/70 text-lg mb-8">Add Shopkeep to your Discord server in under two minutes.</p>
+        <div class="flex gap-3 justify-center flex-wrap">
+          <a href="{{ invite_url }}" class="btn bg-base-100 text-primary hover:bg-base-200 border-0 btn-lg">Add to Discord</a>
+          <a href="/commands" class="btn btn-outline border-primary-content/30 text-primary-content hover:bg-primary-content/10 btn-lg">View commands</a>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <footer class="bg-base-content text-base-100 py-12 px-6">
@@ -170,6 +387,7 @@
           <a href="/" class="hover:text-base-100 transition-colors">Home</a>
           <a href="/commands" class="hover:text-base-100 transition-colors">Commands</a>
           <a href="/about" class="hover:text-base-100 transition-colors">About</a>
+          <a href="/changelog" class="hover:text-base-100 transition-colors">Changelog</a>
           <a href="/privacy" class="hover:text-base-100 transition-colors">Privacy Policy</a>
           <a href="/terms" class="hover:text-base-100 transition-colors">Terms of Service</a>
         </div>

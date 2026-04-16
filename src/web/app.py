@@ -186,6 +186,11 @@ def about():
     return render_template("about.html")
 
 
+@app.route("/changelog")
+def changelog():
+    return render_template("changelog.html")
+
+
 @app.route("/privacy")
 def privacy():
     return render_template("privacy.html")
