@@ -43,6 +43,18 @@ PKCE_STATE_TTL = 600  # 10 minutes
 
 webdb.init_pkce_table()
 
+_INVITE_URL = (
+    f"https://discord.com/oauth2/authorize"
+    f"?client_id={DISCORD_CLIENT_ID}"
+    f"&permissions=19456"
+    f"&scope=bot%20applications.commands"
+)
+
+
+@app.context_processor
+def inject_globals() -> dict:
+    return {"invite_url": _INVITE_URL}
+
 
 # ── PKCE helpers ──────────────────────────────────────────────────────────────
 
@@ -63,13 +75,7 @@ def _user_id_from_token(access_token: str) -> str | None:
 
 @app.route("/")
 def index():
-    invite_url = (
-        f"https://discord.com/oauth2/authorize"
-        f"?client_id={DISCORD_CLIENT_ID}"
-        f"&permissions=19456"
-        f"&scope=bot%20applications.commands"
-    )
-    return render_template("index.html", invite_url=invite_url)
+    return render_template("index.html")
 
 
 @app.route("/connect/<setup_token>", methods=["GET", "POST"])
