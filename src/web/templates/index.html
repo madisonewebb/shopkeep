@@ -28,7 +28,7 @@
         </ul>
       </div>
       <a href="/" class="flex items-center gap-2">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-lg">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-10 h-10 rounded-xl">
         <span class="font-display font-bold text-base-content text-base">Shopkeep</span>
       </a>
     </div>
@@ -54,12 +54,19 @@
   <main>
 
     <!-- Hero -->
-    <section class="py-20 px-6">
-      <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+    <section class="py-20 px-6 relative overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+        <div class="absolute -top-32 -right-32 w-[520px] h-[520px] rounded-full" style="background:radial-gradient(circle,oklch(56.86% 0.255 257.57 / 0.18),transparent 70%)"></div>
+        <div class="absolute -bottom-24 -left-24 w-[420px] h-[420px] rounded-full" style="background:radial-gradient(circle,oklch(59.939% 0.191 335.171 / 0.14),transparent 70%)"></div>
+        <div class="absolute top-1/2 left-1/2 w-72 h-72 rounded-full -translate-x-1/2 -translate-y-1/2" style="background:radial-gradient(circle,oklch(42.551% 0.161 282.339 / 0.10),transparent 70%)"></div>
+      </div>
+      <div class="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center relative">
         <div>
-          <div class="badge badge-primary font-semibold mb-6 px-3 py-2 h-auto text-sm">Etsy × Discord</div>
-          <h1 class="font-display font-extrabold text-5xl md:text-6xl leading-[1.05] tracking-tight mb-6 text-base-content">
-            Etsy order alerts,<br>right in Discord
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-20 h-20 rounded-3xl shadow-xl mb-6">
+          <div class="badge badge-primary font-semibold mb-4 px-3 py-2 h-auto text-sm">Etsy × Discord</div>
+          <h1 class="font-display font-extrabold text-5xl md:text-6xl leading-[1.05] tracking-tight mb-6">
+            <span style="background:linear-gradient(135deg,oklch(56.86% 0.255 257.57),oklch(42.551% 0.161 282.339));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Etsy order alerts,</span><br>
+            <span class="text-base-content">right in Discord</span>
           </h1>
           <p class="text-base-content/60 text-lg leading-relaxed mb-8 max-w-md">
             Shopkeep watches your shop and posts a notification the moment a new order arrives. No refreshing, no missed sales.
@@ -107,6 +114,7 @@
     </section>
 
     <!-- Features -->
+
     <section class="py-20 px-6 bg-base-200">
       <div class="max-w-6xl mx-auto">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-12">
@@ -115,9 +123,9 @@
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-primary/20" style="background:oklch(56.86% 0.255 257.57 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <div class="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Instant order alerts</h3>
@@ -125,9 +133,9 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-success/20" style="background:oklch(76% 0.177 163.223 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center text-success">
+              <div class="w-10 h-10 rounded-xl bg-success/15 flex items-center justify-center text-success">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Revenue summaries</h3>
@@ -135,9 +143,9 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-warning/20" style="background:oklch(82% 0.189 84.429 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center text-warning">
+              <div class="w-10 h-10 rounded-xl bg-warning/15 flex items-center justify-center text-warning">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Shipping reminders</h3>
@@ -145,9 +153,9 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-secondary/20" style="background:oklch(42.551% 0.161 282.339 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+              <div class="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Order management</h3>
@@ -155,9 +163,9 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-accent/20" style="background:oklch(59.939% 0.191 335.171 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+              <div class="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Read-only &amp; secure</h3>
@@ -165,9 +173,9 @@
             </div>
           </div>
 
-          <div class="card bg-base-100 border border-base-300">
+          <div class="card border border-info/20" style="background:oklch(74% 0.16 232.661 / 0.06)">
             <div class="card-body gap-3">
-              <div class="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center text-info">
+              <div class="w-10 h-10 rounded-xl bg-info/15 flex items-center justify-center text-info">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
               </div>
               <h3 class="font-display font-bold text-base text-base-content">Free forever</h3>
