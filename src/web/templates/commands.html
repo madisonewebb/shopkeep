@@ -3,175 +3,164 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Commands — Shopkeep</title>
+  <title>Commands - Shopkeep</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Nunito:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
-  <script>document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"winter");</script>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg: '#07070f',
+              surface: '#0f0f1a',
+              s2: '#16162a',
+              s3: '#1e1e33',
+              border: '#252540',
+              brite: '#3b3b6e',
+              indigo: '#6366f1',
+              blue: '#3b82f6',
+              lindigo: '#a5b4fc',
+              lblue: '#93c5fd',
+              text: '#f0f0ff',
+              muted: '#8b8baf',
+              dim: '#4a4a72',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            body: ['Figtree', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #07070f;
+      background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
+      min-height: 100vh;
+    }
+    .main-nav {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(7, 7, 15, 0.8);
+      border-bottom: 1px solid #252540;
+    }
+    .btn-primary {
+      background: #6366f1;
+      border: 1px solid rgba(165, 180, 252, 0.2);
+      transition: all 0.15s ease;
+      display: inline-block;
+    }
+    .btn-primary:hover {
+      background: #818cf8;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+    .cmd-card {
+      background: #0f0f1a;
+      border: 1px solid #252540;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color 0.15s;
+    }
+    .cmd-card:hover { border-color: #3b3b6e; }
+    .divider { height: 1px; background: #252540; }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
 </head>
-<body class="font-body antialiased">
+<body class="font-body text-sk-text antialiased">
 
-  <div class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-50">
-    <div class="navbar-start px-4">
-      <div class="dropdown md:hidden">
-        <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square mr-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 18h16"/></svg>
-        </div>
-        <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 border border-base-300 rounded-box z-50 mt-3 w-48 shadow-lg font-semibold">
-          <li><a href="/">Home</a></li>
-          <li><a href="/commands">Commands</a></li>
-          <li><a href="/about">About</a></li>
-          <li><a href="/changelog">Changelog</a></li>
-          <li><a href="/privacy">Privacy</a></li>
-          <li><a href="/terms">Terms</a></li>
-        </ul>
+  <nav class="main-nav fixed top-0 left-0 right-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+      <div class="hidden md:flex items-center gap-1">
+        <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
+        <a href="/commands" class="px-3 py-1.5 text-sm text-sk-text rounded-md">Commands</a>
+        <a href="/about" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">About</a>
+        <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
+        <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
       </div>
-      <a href="/" class="flex items-center gap-2">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-10 h-10 rounded-xl">
-        <span class="font-display font-bold text-base-content text-base">Shopkeep</span>
-      </a>
     </div>
-    <div class="navbar-center hidden md:flex">
-      <ul class="menu menu-horizontal gap-0 text-sm font-semibold px-1">
-        <li><a href="/" class="text-base-content/50 hover:text-base-content rounded-lg">Home</a></li>
-        <li><a href="/commands" class="rounded-lg">Commands</a></li>
-        <li><a href="/about" class="text-base-content/50 hover:text-base-content rounded-lg">About</a></li>
-        <li><a href="/changelog" class="text-base-content/50 hover:text-base-content rounded-lg">Changelog</a></li>
-        <li><a href="/privacy" class="text-base-content/50 hover:text-base-content rounded-lg">Privacy</a></li>
-        <li><a href="/terms" class="text-base-content/50 hover:text-base-content rounded-lg">Terms</a></li>
-      </ul>
-    </div>
-    <div class="navbar-end gap-2 px-4">
-      <button id="theme-toggle" class="btn btn-ghost btn-sm btn-square" aria-label="Toggle theme">
-        <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-        <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364-.707.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M6.343 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-      </button>
-      <a href="{{ invite_url }}" class="btn btn-primary btn-sm">Add to Discord</a>
-    </div>
-  </div>
+  </nav>
 
-  <main class="py-20 px-6">
-    <div class="max-w-6xl mx-auto">
+  <main class="pt-28 pb-24 px-6">
+    <div class="max-w-2xl mx-auto">
 
-      <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-12">
-        <span class="badge badge-primary font-bold px-4 py-3 h-auto text-sm whitespace-nowrap">Reference</span>
-        <div>
-          <h1 class="font-display font-extrabold text-4xl tracking-tight text-base-content">Commands</h1>
-          <p class="text-base-content/60 text-sm mt-1">All slash commands available in Discord servers with Shopkeep installed.</p>
-        </div>
-      </div>
+      <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-4">Reference</p>
+      <h1 class="font-display font-bold text-4xl tracking-tight mb-3">Commands</h1>
+      <p class="text-sk-muted mb-12">All slash commands available in any Discord server with Shopkeep installed.</p>
 
-      <div class="grid sm:grid-cols-2 gap-4">
+      <div class="divider mb-8"></div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/setchannel</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Set the Discord channel where new order notifications will be posted. Run this in the channel you want to use. Requires Manage Channels permission.</p>
-          </div>
+      <div class="grid gap-3">
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/setchannel</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Set the Discord channel where new order notifications will be posted. Run this in the channel you want to use. Requires Manage Channels permission.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/status</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Show the Etsy shop connected to this server and which channel is set for order notifications.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Show the Etsy shop connected to this server and which channel is set for order notifications.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/shop</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Display information about the Etsy shop connected to this server, including shop name, ID, and connection status.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/shop</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Display information about the Etsy shop connected to this server, including shop name, ID, and connection status.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/orders [days] [status]</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">List orders from your connected Etsy shop. Defaults to the last 30 days, open orders only. Filter by status: open, completed, canceled, or all.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/orders [days] [status]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">List orders from your connected Etsy shop. Defaults to the last 30 days, open orders only. Filter by status: open, completed, canceled, or all.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/revenue [period]</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Show a revenue summary for a time period — today, this week, or this month (default).</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/revenue [period]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Show a revenue summary for a time period — today, this week, or this month (default).</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/listings</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Browse your active Etsy listings.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/listings</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Browse your active Etsy listings.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/disconnect</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Unlink your Etsy shop from this server.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/disconnect</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Unlink your Etsy shop from this server.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all">
-          <div class="card-body gap-3">
-            <div><code class="badge badge-primary badge-outline font-semibold">/help</code></div>
-            <p class="text-sm text-base-content/60 leading-relaxed">List all Shopkeep commands.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/help</code>
+          <p class="text-sm text-sk-muted leading-relaxed">List all Shopkeep commands.</p>
         </div>
 
-        <div class="card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-sm transition-all sm:col-span-2">
-          <div class="card-body gap-3">
-            <div class="flex flex-wrap gap-2">
-              <code class="badge badge-primary badge-outline font-semibold">/preset add</code>
-              <code class="badge badge-primary badge-outline font-semibold">/preset list</code>
-              <code class="badge badge-primary badge-outline font-semibold">/preset remove</code>
-            </div>
-            <p class="text-sm text-base-content/60 leading-relaxed">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when printing labels.</p>
-          </div>
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/preset add · /preset list · /preset remove</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when printing labels. Use <code class="text-sk-lblue">/preset list</code> to view all saved presets and <code class="text-sk-lblue">/preset remove</code> to delete one.</p>
         </div>
-
       </div>
     </div>
   </main>
 
-  <footer class="bg-base-content text-base-100 py-12 px-6">
-    <div class="max-w-6xl mx-auto">
-      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 pb-8 border-b border-base-100/10">
-        <a href="/" class="flex items-center gap-2">
-          <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-8 h-8 rounded-lg opacity-80">
-          <span class="font-display font-bold text-base-100">Shopkeep</span>
-        </a>
-        <div class="flex flex-wrap gap-6 text-sm text-base-100/50 font-semibold">
-          <a href="/" class="hover:text-base-100 transition-colors">Home</a>
-          <a href="/commands" class="hover:text-base-100 transition-colors">Commands</a>
-          <a href="/about" class="hover:text-base-100 transition-colors">About</a>
-          <a href="/changelog" class="hover:text-base-100 transition-colors">Changelog</a>
-          <a href="/privacy" class="hover:text-base-100 transition-colors">Privacy Policy</a>
-          <a href="/terms" class="hover:text-base-100 transition-colors">Terms of Service</a>
-        </div>
-        <a href="{{ invite_url }}" class="btn btn-primary btn-sm">Add to Discord</a>
+  <footer class="border-t border-sk-border py-8 px-6">
+    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <span class="font-display font-semibold text-sm text-sk-dim">Shopkeep</span>
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-sk-dim">
+        <a href="/" class="hover:text-sk-muted transition-colors">Home</a>
+        <a href="/commands" class="hover:text-sk-muted transition-colors">Commands</a>
+        <a href="/about" class="hover:text-sk-muted transition-colors">About</a>
+        <a href="/privacy" class="hover:text-sk-muted transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-sk-muted transition-colors">Terms of Service</a>
       </div>
-      <p class="text-xs text-base-100/30 font-mono">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses Etsy&rsquo;s API but is not endorsed or certified by Etsy.</p>
     </div>
+    <p class="text-xs text-sk-dim font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
   </footer>
 
-<script>
-  (function(){
-    var btn=document.getElementById("theme-toggle");
-    var sun=document.getElementById("icon-sun");
-    var moon=document.getElementById("icon-moon");
-    function apply(t){
-      document.documentElement.setAttribute("data-theme",t);
-      localStorage.setItem("theme",t);
-      if(sun)sun.classList.toggle("hidden",t!=="shopkeep-dark");
-      if(moon)moon.classList.toggle("hidden",t==="shopkeep-dark");
-    }
-    apply(localStorage.getItem("theme")||"winter");
-    if(btn)btn.addEventListener("click",function(){
-      apply(document.documentElement.getAttribute("data-theme")==="shopkeep-dark"?"winter":"shopkeep-dark");
-    });
-  })();
-</script>
 </body>
 </html>
