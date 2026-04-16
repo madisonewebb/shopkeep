@@ -6,7 +6,7 @@
   <title>Shopkeep - Etsy Order Notifications for Discord</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -14,27 +14,26 @@
         extend: {
           colors: {
             sk: {
-              bg: '#07070f',
-              surface: '#0f0f1a',
-              s2: '#16162a',
-              s3: '#1e1e33',
-              border: '#252540',
-              brite: '#3b3b6e',
-              indigo: '#6366f1',
-              blue: '#3b82f6',
-              lindigo: '#a5b4fc',
-              lblue: '#93c5fd',
-              text: '#f0f0ff',
-              muted: '#8b8baf',
-              dim: '#4a4a72',
+              bg:      '#FDF8F2',
+              surface: '#F7EFE3',
+              s2:      '#EFE3D0',
+              s3:      '#E6D4BC',
+              border:  '#DCCFBC',
+              brite:   '#C8A882',
+              indigo:  '#D4635A',
+              blue:    '#4A3B8C',
+              lindigo: '#E8A09A',
+              lblue:   '#9B8DC4',
+              text:    '#2A1F16',
+              muted:   '#7A6858',
+              dim:     '#B09A84',
             }
           },
           fontFamily: {
-            display: ['"Bricolage Grotesque"', 'sans-serif'],
-            body: ['Figtree', 'sans-serif'],
+            display: ['Fraunces', 'serif'],
+            body: ['"DM Sans"', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace'],
           }
-        }
       }
     }
   </script>
@@ -42,47 +41,47 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      background-color: #07070f;
+      background-color: #FDF8F2;
       background-image:
-        radial-gradient(ellipse 100% 60% at 50% -20%, rgba(99, 102, 241, 0.18) 0%, transparent 60%);
+        radial-gradient(ellipse 100% 60% at 50% -20%, rgba(212, 99, 90, 0.12) 0%, transparent 60%);
       min-height: 100vh;
     }
     .main-nav {
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      background: rgba(7, 7, 15, 0.8);
-      border-bottom: 1px solid #252540;
+      background: rgba(253, 248, 242, 0.88);
+      border-bottom: 1px solid #DCCFBC;
     }
     .btn-primary {
-      background: #6366f1;
-      border: 1px solid rgba(165, 180, 252, 0.2);
+      background: #D4635A;
+      border: 1px solid rgba(232, 160, 154, 0.3);
       transition: all 0.15s ease;
       display: inline-block;
     }
     .btn-primary:hover {
-      background: #818cf8;
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+      background: #C25548;
+      box-shadow: 0 0 0 3px rgba(212, 99, 90, 0.25);
       transform: translateY(-1px);
     }
     .btn-secondary {
       background: transparent;
-      border: 1px solid #252540;
-      color: #8b8baf;
+      border: 1px solid #DCCFBC;
+      color: #7A6858;
       transition: all 0.15s ease;
       display: inline-block;
     }
     .btn-secondary:hover {
-      border-color: #3b3b6e;
-      color: #f0f0ff;
+      border-color: #B09A84;
+      color: #2A1F16;
     }
     .divider {
       height: 1px;
-      background: #252540;
+      background: #DCCFBC;
     }
     .step-num {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.7rem;
-      color: #4a4a72;
+      color: #D4635A;
       flex-shrink: 0;
       width: 28px;
       padding-top: 3px;
@@ -90,11 +89,11 @@
     code {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.85em;
-      background: #16162a;
-      border: 1px solid #252540;
+      background: #EFE3D0;
+      border: 1px solid #DCCFBC;
       padding: 0.1em 0.45em;
       border-radius: 4px;
-      color: #93c5fd;
+      color: #4A3B8C;
     }
   </style>
 </head>
