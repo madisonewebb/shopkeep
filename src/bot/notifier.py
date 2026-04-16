@@ -232,15 +232,15 @@ def build_order_embed(
             line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
             variations = t.get("selected_variations") or t.get("variations") or []
             if variations:
-                var_str = ", ".join(
+                var_parts = [
                     f"{v['formatted_name']}: {v['formatted_value']}"
                     for v in variations
                     if v.get("formatted_name") and v.get("formatted_value")
-                )
-                if var_str:
-                    line += f"\n  *{var_str}*"
+                ]
+                if var_parts:
+                    line += "\n  " + "\n  ".join(var_parts)
             if msg := t.get("personalization_msg"):
-                line += f"\n  📝 ||{msg}||"
+                line += f"\n  📝 {msg}"
             item_lines.append(line)
         if item_lines:
             embed.add_field(name="Items", value="\n".join(item_lines), inline=False)
@@ -532,17 +532,11 @@ def build_shipping_reminder_embed(
                 for v in variations:
                     if not (v.get("formatted_name") and v.get("formatted_value")):
                         continue
-                    name_lower = v["formatted_name"].lower()
-                    value = v["formatted_value"]
-                    # Wrap personalization text in spoiler tags so it's expandable
-                    if "personal" in name_lower or "custom" in name_lower or "engrav" in name_lower:
-                        var_parts.append(f"{v['formatted_name']}: ||{value}||")
-                    else:
-                        var_parts.append(f"{v['formatted_name']}: {value}")
+                    var_parts.append(f"{v['formatted_name']}: {v['formatted_value']}")
                 if var_parts:
-                    line += "\n  " + ", ".join(var_parts)
+                    line += "\n  " + "\n  ".join(var_parts)
             if msg := t.get("personalization_msg"):
-                line += f"\n  📝 ||{msg}||"
+                line += f"\n  📝 {msg}"
             item_lines.append(line)
             if thumbnail_url is None and t.get("image_url"):
                 thumbnail_url = t["image_url"]
