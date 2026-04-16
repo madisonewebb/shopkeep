@@ -1,13 +1,3 @@
-FROM node:20-slim AS css-builder
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
-COPY src/web/static/css/input.css src/web/static/css/input.css
-COPY src/web/templates/ src/web/templates/
-RUN npm run css:build
-
 FROM python:3.10-slim
 WORKDIR /app
 
@@ -24,7 +14,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
-COPY --from=css-builder /app/src/web/static/css/output.css src/web/static/css/output.css
 
 RUN useradd -m -u 1000 webuser && \
     chown -R webuser:webuser /app

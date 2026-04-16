@@ -3,80 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connected — Shopkeep</title>
+  <title>Connected - Shopkeep</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Nunito:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
-  <script>document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"winter");</script>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg: '#07070f',
+              surface: '#0f0f1a',
+              s2: '#16162a',
+              s3: '#1e1e33',
+              border: '#252540',
+              brite: '#3b3b6e',
+              indigo: '#6366f1',
+              blue: '#3b82f6',
+              lindigo: '#a5b4fc',
+              lblue: '#93c5fd',
+              text: '#f0f0ff',
+              muted: '#8b8baf',
+              dim: '#4a4a72',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            body: ['Figtree', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #07070f;
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+      min-height: 100vh;
+    }
+    .card {
+      background: #0f0f1a;
+      border: 1px solid #252540;
+      border-radius: 16px;
+    }
+    .success-dot {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(52, 211, 153, 0.1);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: #16162a;
+      border: 1px solid #252540;
+      border-radius: 8px;
+    }
+    .cmd-row code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #93c5fd;
+    }
+  </style>
 </head>
-<body class="font-body antialiased">
+<body class="font-body text-sk-text antialiased">
 
   <div class="min-h-screen flex flex-col">
-    <header class="h-14 flex items-center px-6 border-b border-base-300 bg-base-100">
-      <div class="flex-1"></div>
-      <a href="/" class="flex items-center gap-2">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-10 h-10 rounded-xl">
-        <span class="font-display font-bold text-base-content text-base">Shopkeep</span>
-      </a>
-      <div class="flex-1 flex justify-end">
-        <button id="theme-toggle" class="btn btn-ghost btn-sm btn-square" aria-label="Toggle theme">
-        <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-        <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364-.707.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M6.343 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-      </button>
-      </div>
+    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
     </header>
 
-    <main class="flex-1 flex items-center justify-center px-6 py-16 bg-base-200">
-      <div class="card bg-base-100 border border-base-300 shadow-sm w-full max-w-sm">
-        <div class="card-body gap-5">
-          <div class="w-10 h-10 rounded-full bg-success/15 border border-success/30 flex items-center justify-center text-success">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8L7 12L13 5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+    <main class="flex-1 flex items-center justify-center px-6 py-16">
+      <div class="card w-full max-w-sm p-8">
+        <div class="success-dot mb-6">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8L7 12L13 5" stroke="#34d399" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-3">Connected</p>
+        <h1 class="font-display font-bold text-2xl tracking-tight mb-3">{{ shop_name }} is live</h1>
+        <p class="text-sm text-sk-muted leading-relaxed mb-7">
+          Shopkeep is monitoring your Etsy shop. Finish setup in Discord with these commands.
+        </p>
+        <div class="grid gap-2">
+          <div class="cmd-row">
+            <code>/setchannel</code>
+            <span class="text-xs text-sk-muted">Pick where notifications go</span>
           </div>
-          <div>
-            <span class="badge badge-primary font-semibold mb-3 px-3 py-2 h-auto text-xs">Connected</span>
-            <h1 class="font-display font-bold text-2xl tracking-tight text-base-content">{{ shop_name }} is live</h1>
+          <div class="cmd-row">
+            <code>/shop</code>
+            <span class="text-xs text-sk-muted">View shop info</span>
           </div>
-          <p class="text-sm text-base-content/60 leading-relaxed font-medium">
-            Shopkeep is monitoring your Etsy shop. Finish setup in Discord with these commands.
-          </p>
-          <div class="grid gap-2 mt-1">
-            <div class="flex items-center gap-3 p-2.5 px-3 bg-base-200 rounded-xl">
-              <code class="text-primary font-semibold">/setchannel</code>
-              <span class="text-xs text-base-content/50 font-semibold">Pick where notifications go</span>
-            </div>
-            <div class="flex items-center gap-3 p-2.5 px-3 bg-base-200 rounded-xl">
-              <code class="text-primary font-semibold">/shop</code>
-              <span class="text-xs text-base-content/50 font-semibold">View shop info</span>
-            </div>
-            <div class="flex items-center gap-3 p-2.5 px-3 bg-base-200 rounded-xl">
-              <code class="text-primary font-semibold">/orders</code>
-              <span class="text-xs text-base-content/50 font-semibold">List recent orders</span>
-            </div>
+          <div class="cmd-row">
+            <code>/orders</code>
+            <span class="text-xs text-sk-muted">List recent orders</span>
           </div>
         </div>
       </div>
     </main>
   </div>
 
-<script>
-  (function(){
-    var btn=document.getElementById("theme-toggle");
-    var sun=document.getElementById("icon-sun");
-    var moon=document.getElementById("icon-moon");
-    function apply(t){
-      document.documentElement.setAttribute("data-theme",t);
-      localStorage.setItem("theme",t);
-      if(sun)sun.classList.toggle("hidden",t!=="shopkeep-dark");
-      if(moon)moon.classList.toggle("hidden",t==="shopkeep-dark");
-    }
-    apply(localStorage.getItem("theme")||"winter");
-    if(btn)btn.addEventListener("click",function(){
-      apply(document.documentElement.getAttribute("data-theme")==="shopkeep-dark"?"winter":"shopkeep-dark");
-    });
-  })();
-</script>
 </body>
 </html>

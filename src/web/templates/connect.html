@@ -3,64 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect your Etsy shop — Shopkeep</title>
+  <title>Connect your Etsy shop - Shopkeep</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Nunito:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
-  <script>document.documentElement.setAttribute("data-theme",localStorage.getItem("theme")||"winter");</script>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg: '#07070f',
+              surface: '#0f0f1a',
+              s2: '#16162a',
+              s3: '#1e1e33',
+              border: '#252540',
+              brite: '#3b3b6e',
+              indigo: '#6366f1',
+              blue: '#3b82f6',
+              lindigo: '#a5b4fc',
+              lblue: '#93c5fd',
+              text: '#f0f0ff',
+              muted: '#8b8baf',
+              dim: '#4a4a72',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            body: ['Figtree', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #07070f;
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
+      min-height: 100vh;
+    }
+    .card {
+      background: #0f0f1a;
+      border: 1px solid #252540;
+      border-radius: 16px;
+    }
+    .btn-primary {
+      background: #6366f1;
+      border: 1px solid rgba(165, 180, 252, 0.2);
+      transition: all 0.15s ease;
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-primary:hover {
+      background: #818cf8;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+  </style>
 </head>
-<body class="font-body antialiased">
+<body class="font-body text-sk-text antialiased">
 
   <div class="min-h-screen flex flex-col">
-    <header class="h-14 flex items-center px-6 border-b border-base-300 bg-base-100">
-      <div class="flex-1"></div>
-      <a href="/" class="flex items-center gap-2">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-10 h-10 rounded-xl">
-        <span class="font-display font-bold text-base-content text-base">Shopkeep</span>
-      </a>
-      <div class="flex-1 flex justify-end">
-        <button id="theme-toggle" class="btn btn-ghost btn-sm btn-square" aria-label="Toggle theme">
-        <svg id="icon-sun" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-        <svg id="icon-moon" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364-.707.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M6.343 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-      </button>
-      </div>
+    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
     </header>
 
-    <main class="flex-1 flex items-center justify-center px-6 py-16 bg-base-200">
-      <div class="card bg-base-100 border border-base-300 shadow-sm w-full max-w-sm">
-        <div class="card-body gap-5">
-          <div>
-            <span class="badge badge-primary font-semibold mb-4 px-3 py-2 h-auto text-xs">Setup</span>
-            <h1 class="font-display font-bold text-2xl tracking-tight text-base-content">Connect your Etsy shop</h1>
-          </div>
-          <p class="text-sm text-base-content/60 leading-relaxed font-medium">
-            {% if guild_name %}Setting up Shopkeep for <strong class="text-base-content font-bold">{{ guild_name }}</strong>. {% endif %}Authorize Shopkeep to read orders from your Etsy account.
-          </p>
-          <form method="post" class="mt-1">
-            <button type="submit" class="btn btn-primary w-full">Authorize with Etsy</button>
-          </form>
-        </div>
+    <main class="flex-1 flex items-center justify-center px-6 py-16">
+      <div class="card w-full max-w-sm p-8">
+        <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-5">Setup</p>
+        <h1 class="font-display font-bold text-2xl tracking-tight mb-3">Connect your Etsy shop</h1>
+        <p class="text-sm text-sk-muted leading-relaxed mb-7">
+          {% if guild_name %}Setting up Shopkeep for <strong class="text-sk-text font-medium">{{ guild_name }}</strong>. {% endif %}Authorize Shopkeep to read orders from your Etsy account.
+        </p>
+        <form method="post">
+          <button type="submit" class="btn-primary font-semibold text-white py-2.5 rounded-lg text-sm">
+            Authorize with Etsy
+          </button>
+        </form>
       </div>
     </main>
   </div>
 
-<script>
-  (function(){
-    var btn=document.getElementById("theme-toggle");
-    var sun=document.getElementById("icon-sun");
-    var moon=document.getElementById("icon-moon");
-    function apply(t){
-      document.documentElement.setAttribute("data-theme",t);
-      localStorage.setItem("theme",t);
-      if(sun)sun.classList.toggle("hidden",t!=="shopkeep-dark");
-      if(moon)moon.classList.toggle("hidden",t==="shopkeep-dark");
-    }
-    apply(localStorage.getItem("theme")||"winter");
-    if(btn)btn.addEventListener("click",function(){
-      apply(document.documentElement.getAttribute("data-theme")==="shopkeep-dark"?"winter":"shopkeep-dark");
-    });
-  })();
-</script>
 </body>
 </html>
