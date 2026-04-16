@@ -496,11 +496,11 @@ def build_shipping_reminder_embed(
         deadline_line = "This order is due to ship **today**."
     elif days_before == 1:
         urgency = "Ship Tomorrow"
-        color = discord.Color.orange()
+        color = discord.Color.yellow()
         deadline_line = "This order is due to ship **tomorrow**."
     else:
         urgency = f"Ship in {days_before} Days"
-        color = discord.Color.yellow()
+        color = discord.Color.green()
         deadline_line = f"This order is due to ship in **{days_before} days**."
 
     embed = discord.Embed(
