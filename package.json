@@ -1,0 +1,13 @@
+{
+  "name": "shopkeep-web",
+  "private": true,
+  "scripts": {
+    "css:build": "tailwindcss -i src/web/static/css/input.css -o src/web/static/css/output.css --minify",
+    "css:watch": "tailwindcss -i src/web/static/css/input.css -o src/web/static/css/output.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "tailwindcss": "^4.0.0",
+    "daisyui": "^5.0.0"
+  }
+}
