@@ -148,18 +148,23 @@ def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str =
             if deadline and not r.get("is_shipped"):
                 lines.append(deadline)
 
+            item_blocks = []
             for t in txns:
                 if not t.get("title"):
                     continue
                 qty = t.get("quantity", 1)
-                item_lines = [f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")]
+                item_lines = [f"**{t['title']}" + (f" ×{qty}**" if qty > 1 else "**")]
                 variations = t.get("selected_variations") or t.get("variations") or []
                 for v in variations:
                     if v.get("formatted_name") and v.get("formatted_value"):
                         item_lines.append(f"  {v['formatted_name']}: {v['formatted_value']}")
                 if msg := t.get("personalization_msg"):
                     item_lines.append(f"  📝 {msg}")
-                lines.append("\n".join(item_lines))
+                item_blocks.append("\n".join(item_lines))
+
+            if item_blocks:
+                lines.append("")
+                lines.extend(item_blocks)
 
             embed.add_field(
                 name=buyer,
