@@ -97,6 +97,22 @@ class ConfirmDisconnectView(discord.ui.View):
         await interaction.response.edit_message(content="Disconnect canceled.", embed=None, view=None)
 
 
+def _ship_deadline_str(expected_ship_date: int | None) -> str | None:
+    if not expected_ship_date:
+        return None
+    now = int(time.time())
+    days = (expected_ship_date - now) / 86400
+    if days < -0.5:
+        overdue = int(-days + 0.5)
+        return f"⚠️ Overdue by {overdue}d"
+    elif days < 0.5:
+        return "🚨 Ships today"
+    elif days < 1.5:
+        return "📦 Ships tomorrow"
+    else:
+        return f"📦 Ships in {int(days + 0.5)}d"
+
+
 def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str = "") -> list[discord.Embed]:
     total = len(receipts)
     total_pages = (total + _ORDERS_PAGE_SIZE - 1) // _ORDERS_PAGE_SIZE
@@ -120,9 +136,33 @@ def _build_orders_pages(receipts: list[dict], shop_name: str, revenue_str: str =
             status = (r.get("status") or "Unknown").capitalize()
             shipped = "Shipped" if r.get("is_shipped") else "Not shipped"
             buyer = r.get("name") or "Unknown"
+
+            lines = [f"{total_str} · {status} · {shipped}"]
+
+            deadline = _ship_deadline_str(r.get("expected_ship_date"))
+            if deadline and not r.get("is_shipped"):
+                lines.append(deadline)
+
+            for t in (r.get("transactions") or []):
+                if not t.get("title"):
+                    continue
+                qty = t.get("quantity", 1)
+                line = f"• {t['title']}" + (f" ×{qty}" if qty > 1 else "")
+                variations = t.get("selected_variations") or t.get("variations") or []
+                var_parts = [
+                    f"{v['formatted_name']}: {v['formatted_value']}"
+                    for v in variations
+                    if v.get("formatted_name") and v.get("formatted_value")
+                ]
+                if var_parts:
+                    line += " · " + ", ".join(var_parts)
+                if msg := t.get("personalization_msg"):
+                    line += f"\n  📝 {msg}"
+                lines.append(line)
+
             embed.add_field(
                 name=f"Order #{r.get('receipt_id')} — {buyer}",
-                value=f"{total_str} · {status} · {shipped}",
+                value="\n".join(lines),
                 inline=False,
             )
         footer = shop_name if total_pages == 1 else f"Page {page_num} of {total_pages} · {shop_name}"
