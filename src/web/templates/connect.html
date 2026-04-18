@@ -4,9 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connect your Etsy shop - Shopkeep</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -30,9 +27,9 @@
             }
           },
           fontFamily: {
-            display: ['Fraunces', 'serif'],
-            body: ['"DM Sans"', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
+            display: ['Avita', 'sans-serif'],
+            body: ['Avita', 'sans-serif'],
+            mono: ['Avita', 'sans-serif'],
             mochibop: ['Mochibop', 'serif'],
           }
       }
@@ -48,6 +45,10 @@
       font-family: 'Mochibop';
       src: url("{{ url_for('static', filename='MochibopBold-Demo.ttf') }}") format('truetype');
       font-weight: 700;
+    }
+    @font-face {
+      font-family: 'Avita';
+      src: url("{{ url_for('static', filename='Avita-RoundedBlack.otf') }}") format('opentype');
     }
     .font-mochibop { font-family: 'Mochibop', serif; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
