@@ -24,20 +24,31 @@
               blue:    '#A090CC',
               lindigo: '#F0AFA8',
               lblue:   '#C4B8E0',
-              text:    '#F5EDD8',
-              muted:   '#A89070',
-              dim:     '#6B5040',
+              text:    '#FFF5E4',
+              muted:   '#C4A882',
+              dim:     '#8C6E52',
             }
           },
           fontFamily: {
             display: ['Fraunces', 'serif'],
             body: ['"DM Sans"', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace'],
+            mochibop: ['Mochibop', 'serif'],
           }
       }
     }
   </script>
   <style>
+    @font-face {
+      font-family: 'Mochibop';
+      src: url('/static/Mochibop-Demo.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Mochibop';
+      src: url('/static/MochibopBold-Demo.ttf') format('truetype');
+      font-weight: 700;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: #18110A;
@@ -76,11 +87,11 @@
     }
   </style>
 </head>
-<body class="font-body text-sk-text antialiased">
+<body class="font-body text-sk-text antialiased" style="font-weight:450">
 
   <div class="min-h-screen flex flex-col">
-    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
-      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+    <header class="py-4 flex items-center justify-center px-6 border-b border-sk-border">
+      <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
     </header>
 
     <main class="flex-1 flex items-center justify-center px-6 py-16">

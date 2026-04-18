@@ -24,20 +24,31 @@
               blue:    '#A090CC',
               lindigo: '#F0AFA8',
               lblue:   '#C4B8E0',
-              text:    '#F5EDD8',
-              muted:   '#A89070',
-              dim:     '#6B5040',
+              text:    '#FFF5E4',
+              muted:   '#C4A882',
+              dim:     '#8C6E52',
             }
           },
           fontFamily: {
             display: ['Fraunces', 'serif'],
             body: ['"DM Sans"', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace'],
+            mochibop: ['Mochibop', 'serif'],
           }
       }
     }
   </script>
   <style>
+    @font-face {
+      font-family: 'Mochibop';
+      src: url('/static/Mochibop-Demo.ttf') format('truetype');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Mochibop';
+      src: url('/static/MochibopBold-Demo.ttf') format('truetype');
+      font-weight: 700;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
@@ -98,11 +109,11 @@
     }
   </style>
 </head>
-<body class="font-body text-sk-text antialiased">
+<body class="font-body text-sk-text antialiased" style="font-weight:450">
 
   <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+      <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
       <div class="hidden md:flex items-center gap-1">
         <a href="/" class="px-3 py-1.5 text-sm text-sk-text rounded-md">Home</a>
         <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
@@ -118,10 +129,11 @@
     <!-- Hero -->
     <section class="pt-36 pb-24 px-6 text-center">
       <div class="max-w-2xl mx-auto">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-60 h-60 rounded-3xl shadow-xl mx-auto mb-8">
-        <h1 class="font-display font-bold text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-6">
+        <h1 class="font-mochibop text-sk-text text-7xl md:text-8xl leading-none mb-6">Shopkeep</h1>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-32 h-32 rounded-2xl shadow-xl mx-auto mb-8">
+        <h2 class="font-display font-bold text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-6">
           Etsy order alerts, right in Discord
-        </h1>
+        </h2>
         <p class="text-sk-muted text-xl leading-relaxed mb-10 max-w-lg mx-auto">
           Shopkeep watches your shop and posts a notification the moment a new order arrives. No refreshing, no missed sales.
         </p>
