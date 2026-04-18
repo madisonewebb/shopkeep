@@ -42,12 +42,12 @@
   <style>
     @font-face {
       font-family: 'Mochibop';
-      src: url('/static/Mochibop-Demo.ttf') format('truetype');
+      src: url("{{ url_for('static', filename='Mochibop-Demo.ttf') }}") format('truetype');
       font-weight: 400;
     }
     @font-face {
       font-family: 'Mochibop';
-      src: url('/static/MochibopBold-Demo.ttf') format('truetype');
+      src: url("{{ url_for('static', filename='MochibopBold-Demo.ttf') }}") format('truetype');
       font-weight: 700;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
