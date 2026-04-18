@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - Shopkeep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            sk: {
+              bg:      '#18110A',
+              surface: '#221810',
+              s2:      '#2C1F14',
+              s3:      '#36271A',
+              border:  '#4A3526',
+              brite:   '#6B5040',
+              indigo:  '#E07B72',
+              blue:    '#A090CC',
+              lindigo: '#F0AFA8',
+              lblue:   '#C4B8E0',
+              text:    '#FFF5E4',
+              muted:   '#C4A882',
+              dim:     '#8C6E52',
+            }
+          },
+          fontFamily: {
+            display: ['Fraunces', 'serif'],
+            body: ['"DM Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #18110A;
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224, 123, 114, 0.07) 0%, transparent 60%);
+      min-height: 100vh;
+      color: #FFF5E4;
+    }
+    .back-link {
+      color: #A89070;
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: #FFF5E4; }
+    .meme-frame {
+      background: #221810;
+      border: 1px solid #4A3526;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="font-body text-sk-text antialiased" style="font-weight:450">
+
+  <div class="min-h-screen flex flex-col">
+    <header class="h-14 flex items-center justify-center px-6 border-b border-sk-border">
+      <a href="/" class="font-display font-semibold text-sk-text text-base tracking-tight">Shopkeep</a>
+    </header>
+
+    <main class="flex-1 flex items-center justify-center px-6 py-16">
+      <div class="w-full max-w-sm text-center">
+        <p class="font-mono text-xs text-sk-dim tracking-widest uppercase mb-6">404</p>
+        <div class="meme-frame mb-6">
+          <img src="/static/this_is_fine-sal.png" alt="Sal the shopkeep sitting in a burning room: this is fine" class="w-full">
+        </div>
+        <h1 class="font-display font-bold text-2xl tracking-tight mb-3">This is fine.</h1>
+        <p class="text-sm text-sk-muted leading-relaxed mb-7">That page doesn't exist, but Sal's handling it with grace.</p>
+        <a href="/" class="back-link">&larr; Back to home</a>
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>
