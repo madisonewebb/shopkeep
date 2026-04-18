@@ -49,8 +49,15 @@
     }
     @font-face {
       font-family: 'Avita';
-      src: url("{{ url_for('static', filename='Avita-RoundedBlack.otf') }}") format('opentype');
+      src: url("{{ url_for('static', filename='Avita-RoundedThin.otf') }}") format('opentype');
+      font-weight: 100 500;
     }
+    @font-face {
+      font-family: 'Avita';
+      src: url("{{ url_for('static', filename='Avita-RoundedBlack.otf') }}") format('opentype');
+      font-weight: 600 900;
+    }
+    body { font-family: 'Avita', sans-serif; }
     .font-mochibop { font-family: 'Mochibop', serif; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {

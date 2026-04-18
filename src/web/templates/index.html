@@ -48,8 +48,15 @@
     }
     @font-face {
       font-family: 'Avita';
-      src: url("{{ url_for('static', filename='Avita-RoundedBlack.otf') }}") format('opentype');
+      src: url("{{ url_for('static', filename='Avita-RoundedThin.otf') }}") format('opentype');
+      font-weight: 100 500;
     }
+    @font-face {
+      font-family: 'Avita';
+      src: url("{{ url_for('static', filename='Avita-RoundedBlack.otf') }}") format('opentype');
+      font-weight: 600 900;
+    }
+    body { font-family: 'Avita', sans-serif; }
     .font-mochibop { font-family: 'Mochibop', serif; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -133,7 +140,7 @@
       <div class="max-w-2xl mx-auto">
         <h1 class="font-mochibop text-sk-text text-7xl md:text-8xl leading-none mb-6">Shopkeep</h1>
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="w-32 h-32 rounded-2xl shadow-xl mx-auto mb-8">
-        <h2 class="font-display font-bold text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-6">
+        <h2 class="font-mochibop text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-6">
           Etsy order alerts, right in Discord
         </h2>
         <p class="text-sk-muted text-xl leading-relaxed mb-10 max-w-lg mx-auto">
@@ -160,28 +167,28 @@
           <div class="flex gap-4">
             <div class="step-num">01</div>
             <div class="pt-0.5">
-              <p class="text-sk-text font-medium mb-1">Add Shopkeep to Discord</p>
+              <p class="text-sk-text font-semibold mb-1">Add Shopkeep to Discord</p>
               <p class="text-sm text-sk-muted leading-relaxed">Click Add to Discord and select the server where you want order notifications.</p>
             </div>
           </div>
           <div class="flex gap-4">
             <div class="step-num">02</div>
             <div class="pt-0.5">
-              <p class="text-sk-text font-medium mb-1">Get your setup link</p>
+              <p class="text-sk-text font-semibold mb-1">Get your setup link</p>
               <p class="text-sm text-sk-muted leading-relaxed">Shopkeep sends you a private DM with a link to connect your Etsy shop.</p>
             </div>
           </div>
           <div class="flex gap-4">
             <div class="step-num">03</div>
             <div class="pt-0.5">
-              <p class="text-sk-text font-medium mb-1">Authorize with Etsy</p>
+              <p class="text-sk-text font-semibold mb-1">Authorize with Etsy</p>
               <p class="text-sm text-sk-muted leading-relaxed">Follow the link and grant Shopkeep read access to your Etsy orders in one click.</p>
             </div>
           </div>
           <div class="flex gap-4">
             <div class="step-num">04</div>
             <div class="pt-0.5">
-              <p class="text-sk-text font-medium mb-1">Choose a channel</p>
+              <p class="text-sk-text font-semibold mb-1">Choose a channel</p>
               <p class="text-sm text-sk-muted leading-relaxed">Run <code>/setchannel</code> in Discord to pick where notifications appear. That's it.</p>
             </div>
           </div>

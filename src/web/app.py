@@ -12,10 +12,13 @@ Run with:
 
 import base64
 import hashlib
+import mimetypes
 import os
 import secrets
 import time
 import urllib.parse
+
+mimetypes.add_type('font/otf', '.otf')
 
 import requests
 from flask import Flask, redirect, render_template, request
