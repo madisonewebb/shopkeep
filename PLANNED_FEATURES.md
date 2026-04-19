@@ -2,7 +2,7 @@
 Shopkeep - Planned Features
 
 
-WHAT'S ALREADY BUILT (updated 4/13/26)
+WHAT'S ALREADY BUILT (updated 4/19/26)
 
 The following are fully functional:
 
@@ -29,28 +29,13 @@ Order backlog warning: Posts a one-time warning when open unshipped orders excee
 Daily digest: Posts a morning summary of 24hr orders + revenue, open order count, and upcoming ship deadlines; timezone-aware; configure with /digest on, /digest time, /digest off
 Revenue goal tracking: Set a monthly revenue target with /goal set; bot notifies at 25/50/75/100% milestones; progress shown in daily digest; resets automatically each month
 /bestsellers: Shows top 5 listings by units sold or revenue; supports this month / this year / all time; computed from stored transaction data
+/label [receipt_ids] [preset]: Purchase a shipping label for one or more orders; omit receipt IDs to pick from an interactive list; supports comma-separated batch IDs; autocompletes both orders and presets; uses saved /preset configurations
 
 
 STRETCH GOALS
 
-S1. Shipping Label Printing (/printlabel)
 
-What: Create a shipping label for an order directly from Discord using a saved preset.
-
-Details:
-- Uses the Etsy API's shipping label endpoint
-- Owner selects an open order and a saved preset; the bot submits the label creation request
-- Etsy returns a label PDF URL which is posted back as a Discord message
-- Requires shipping presets (/preset) — entering dimensions manually per label would be too cumbersome
-
-Example:
-    /printlabel order:12345 preset:small-jewelry
-    Label created! Download: [PDF link] · Tracking: 9400111899223397522056
-
-Why it's a stretch goal: Label creation involves payment (charged to the Etsy account) and the shipping label A
-
-
-S2. Etsy Conversations + Busy Hours (/busyhours)
+S1. Etsy Conversations + Busy Hours (/busyhours)
 
 What: Surface incoming buyer messages from Etsy into Discord, allow the owner to reply from Discord, and automatically send a customizable away message to buyers who write in during configured busy hours.
 
@@ -93,10 +78,9 @@ Done:
 - Order status change notifications (shipped = green, canceled = red)
 - Shipping deadline reminders (/reminders)
 - Review notifications (star rating, quoted review text, bootstrap deduplication)
-- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset
+- /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset, /label
 
 Stretch:
-S1. Shipping label printing (/printlabel)
-S2. Etsy Conversations + busy hours (/busyhours)
+S1. Etsy Conversations + busy hours (/busyhours)
 
 
