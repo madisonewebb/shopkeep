@@ -551,3 +551,51 @@ def build_shipping_reminder_embed(
 
     embed.set_footer(text=shop_name)
     return embed
+
+
+def build_label_public_embed(
+    results: list[dict],
+    shop_name: str,
+) -> discord.Embed:
+    """Public channel embed posted after label purchase. Lists each order's tracking info."""
+    embed = discord.Embed(
+        title=f"Label{'s' if len(results) != 1 else ''} Purchased",
+        color=discord.Color.green(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    for r in results:
+        receipt_id = r["receipt_id"]
+        tracking = r.get("tracking_code") or r.get("tracking_number") or "N/A"
+        carrier = r.get("carrier_name", "")
+        service = r.get("mail_class", "")
+        value = f"Tracking: `{tracking}`"
+        if carrier or service:
+            value += f"\n{carrier} · {service}"
+        embed.add_field(name=f"Order #{receipt_id}", value=value, inline=False)
+    embed.set_footer(text=shop_name)
+    return embed
+
+
+def build_label_dm_embed(
+    results: list[dict],
+    shop_name: str,
+) -> discord.Embed:
+    """DM embed with PDF download links — one per purchased label."""
+    embed = discord.Embed(
+        title=f"Your Label{'s' if len(results) != 1 else ''}",
+        description="Print these before they expire.",
+        color=discord.Color.blurple(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    for r in results:
+        receipt_id = r["receipt_id"]
+        pdf_url = r.get("pdf_url") or r.get("label_pdf_url") or r.get("download_url")
+        tracking = r.get("tracking_code") or r.get("tracking_number") or "N/A"
+        if pdf_url:
+            value = f"[Download PDF]({pdf_url})\nTracking: `{tracking}`"
+        else:
+            value = f"Tracking: `{tracking}`\n*(PDF URL not returned by Etsy — check your Etsy account)*"
+        embed.add_field(name=f"Order #{receipt_id}", value=value, inline=False)
+    embed.set_footer(text=shop_name)
+    return embed
+

@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS receipts (
     buyer_user_id         INTEGER,
     buyer_email           TEXT,
     name                  TEXT,
+    first_line            TEXT,
+    second_line           TEXT,
     city                  TEXT,
     state                 TEXT,
     zip                   TEXT,
@@ -265,6 +267,14 @@ async def init_db() -> None:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE transactions ADD COLUMN personalization_msg TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE receipts ADD COLUMN first_line TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE receipts ADD COLUMN second_line TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -600,13 +610,13 @@ async def upsert_receipt(
         """
         INSERT OR IGNORE INTO receipts (
             receipt_id, shop_id, receipt_type, seller_user_id, buyer_user_id,
-            buyer_email, name, city, state, zip, country_iso, status,
+            buyer_email, name, first_line, second_line, city, state, zip, country_iso, status,
             payment_method, is_paid, is_shipped, is_gift, gift_message,
             grandtotal_amount, grandtotal_divisor, grandtotal_currency,
             subtotal_amount, total_shipping_amount, total_tax_amount,
             discount_amount, create_timestamp, update_timestamp, expected_ship_date,
             fetched_at, notified_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             receipt["receipt_id"],
@@ -616,6 +626,8 @@ async def upsert_receipt(
             receipt.get("buyer_user_id"),
             receipt.get("buyer_email"),
             receipt.get("name"),
+            receipt.get("first_line"),
+            receipt.get("second_line"),
             receipt.get("city"),
             receipt.get("state"),
             receipt.get("zip"),
@@ -910,6 +922,30 @@ async def delete_preset(db: aiosqlite.Connection, guild_id: int, name: str) -> b
         (guild_id, name),
     )
     return cursor.rowcount == 1
+
+
+async def get_labelable_receipts(db: aiosqlite.Connection, shop_id: int) -> list:
+    """Return paid, unshipped receipts for label autocomplete, newest first."""
+    cursor = await db.execute(
+        """
+        SELECT receipt_id, name, create_timestamp
+        FROM receipts
+        WHERE shop_id = ? AND is_paid = 1 AND is_shipped = 0
+        ORDER BY create_timestamp DESC
+        LIMIT 25
+        """,
+        (shop_id,),
+    )
+    return await cursor.fetchall()
+
+
+async def get_preset_by_name(db: aiosqlite.Connection, guild_id: int, name: str):
+    """Return a single preset row by name, or None."""
+    cursor = await db.execute(
+        "SELECT * FROM shipping_presets WHERE guild_id = ? AND name = ?",
+        (guild_id, name),
+    )
+    return await cursor.fetchone()
 
 
 # ── Review helpers ────────────────────────────────────────────────────────────

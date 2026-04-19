@@ -141,3 +141,29 @@ class EtsyClient:
     ) -> Dict[str, Any]:
         params = {"limit": limit, "offset": offset, "state": state, "includes": ["Images"]}
         return self._request("GET", f"/application/shops/{shop_id}/listings", params=params)
+
+    def create_shipping_label(
+        self,
+        shop_id: int,
+        receipt_id: int,
+        carrier_name: str,
+        mail_class: str,
+        weight_oz: float,
+        length_in: float,
+        width_in: float,
+        height_in: float,
+    ) -> Dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/application/shops/{shop_id}/receipts/{receipt_id}/shipping-labels",
+            json={
+                "carrier_name": carrier_name,
+                "mail_class": mail_class,
+                "weight": weight_oz,
+                "weight_unit": "oz",
+                "length": length_in,
+                "width": width_in,
+                "height": height_in,
+                "dimension_unit": "in",
+            },
+        )

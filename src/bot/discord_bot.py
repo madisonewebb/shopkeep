@@ -10,8 +10,9 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
+from src.usps.client import USPSAddressVerificationError, USPSClient
 
 load_dotenv()
 
@@ -20,6 +21,10 @@ ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
 POLL_INTERVAL_SECS = int(os.getenv("POLL_INTERVAL_SECS", "60"))
 DB_PATH_ENV = os.getenv("DB_PATH", "./shopkeep.db")
 WEB_BASE_URL = os.getenv("WEB_BASE_URL", "")
+
+_usps_client: USPSClient | None = None
+if os.getenv("USPS_CLIENT_ID") and os.getenv("USPS_CLIENT_SECRET"):
+    _usps_client = USPSClient(os.environ["USPS_CLIENT_ID"], os.environ["USPS_CLIENT_SECRET"])
 
 SETUP_TOKEN_TTL = 86400  # 24 hours
 
@@ -95,6 +100,65 @@ class ConfirmDisconnectView(discord.ui.View):
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
         await interaction.response.edit_message(content="Disconnect canceled.", embed=None, view=None)
+
+
+class LabelModal(discord.ui.Modal):
+    weight = discord.ui.TextInput(
+        label="Weight",
+        placeholder="e.g. 4oz or 0.3lb",
+        required=True,
+        max_length=20,
+    )
+    dims = discord.ui.TextInput(
+        label="Dimensions (LxWxH in inches)",
+        placeholder="e.g. 6x4x2",
+        required=True,
+        max_length=30,
+    )
+    carrier = discord.ui.TextInput(
+        label="Carrier",
+        placeholder="USPS or UPS",
+        required=True,
+        max_length=10,
+        default="USPS",
+    )
+    mail_class = discord.ui.TextInput(
+        label="Mail Class",
+        placeholder="e.g. First Class, Priority Mail, Ground",
+        required=True,
+        max_length=50,
+    )
+
+    def __init__(self, bot: "ShopkeepBot", receipt_ids: str):
+        super().__init__(title="Shipping Label Details")
+        self.bot = bot
+        self.receipt_ids_str = receipt_ids
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        weight_oz = _parse_weight_oz(self.weight.value)
+        if weight_oz is None or weight_oz <= 0:
+            await interaction.response.send_message(
+                "Invalid weight. Use a format like `4oz`, `0.3lb`, or `5` (oz).", ephemeral=True
+            )
+            return
+        parsed_dims = _parse_dims(self.dims.value)
+        if parsed_dims is None:
+            await interaction.response.send_message(
+                "Invalid dimensions. Use `LxWxH` in inches, e.g. `6x4x2`.", ephemeral=True
+            )
+            return
+        length_in, width_in, height_in = parsed_dims
+        await interaction.response.defer(ephemeral=True)
+        await self.bot._process_label_purchases(
+            interaction,
+            receipt_ids_str=self.receipt_ids_str,
+            carrier=self.carrier.value.strip().upper(),
+            mail_class=self.mail_class.value.strip(),
+            weight_oz=weight_oz,
+            length_in=length_in,
+            width_in=width_in,
+            height_in=height_in,
+        )
 
 
 def _ship_deadline_str(expected_ship_date: int | None) -> str | None:
@@ -1044,6 +1108,59 @@ class ShopkeepBot(discord.Client):
         ):
             await self._cmd_bestsellers(interaction, period=period, ranked_by=ranked_by)
 
+        @tree.command(name="label", description="Buy a shipping label for one or more orders")
+        @discord.app_commands.describe(
+            receipt_ids="Order receipt ID(s) — comma-separate for batch (e.g. 12345 or 12345,67890)",
+            preset="Shipping preset to use — skips manual entry",
+        )
+        @discord.app_commands.autocomplete(
+            receipt_ids=self._autocomplete_labelable_receipt,
+            preset=self._autocomplete_preset,
+        )
+        async def label(
+            interaction: discord.Interaction,
+            receipt_ids: str,
+            preset: str = "",
+        ):
+            await self._cmd_label(interaction, receipt_ids=receipt_ids, preset=preset)
+
+    async def _autocomplete_labelable_receipt(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[discord.app_commands.Choice[str]]:
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                return []
+            rows = await db.get_labelable_receipts(conn, guild_row["etsy_shop_id"])
+
+        current = current.strip()
+        # Support comma-separated input: autocomplete only the last segment
+        prefix, _, stem = current.rpartition(",")
+        stem = stem.strip()
+
+        choices = []
+        for row in rows:
+            rid = str(row["receipt_id"])
+            buyer = row["name"] or "Unknown buyer"
+            display = f"#{rid} — {buyer}"
+            if stem and stem not in rid and stem.lower() not in buyer.lower():
+                continue
+            value = f"{prefix},{rid}".lstrip(",") if prefix else rid
+            choices.append(discord.app_commands.Choice(name=display[:100], value=value))
+        return choices[:25]
+
+    async def _autocomplete_preset(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[discord.app_commands.Choice[str]]:
+        async with db.get_db() as conn:
+            presets = await db.list_presets(conn, interaction.guild_id)
+        current_lower = current.lower()
+        return [
+            discord.app_commands.Choice(name=p["name"], value=p["name"])
+            for p in presets
+            if current_lower in p["name"].lower()
+        ][:25]
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         commands = [
@@ -1073,6 +1190,7 @@ class ShopkeepBot(discord.Client):
             ("/goal status", "Show current progress toward your monthly goal"),
             ("/goal off", "Remove the monthly revenue goal"),
             ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
+            ("/label <receipt_ids> [preset]", "Buy a shipping label — comma-separate IDs for batch"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -1888,6 +2006,184 @@ class ShopkeepBot(discord.Client):
             shop_name=shop_name,
         )
         await interaction.followup.send(embed=embed)
+
+    async def _cmd_label(
+        self,
+        interaction: discord.Interaction,
+        receipt_ids: str,
+        preset: str = "",
+    ) -> None:
+        if preset:
+            async with db.get_db() as conn:
+                preset_row = await db.get_preset_by_name(conn, interaction.guild_id, preset)
+            if not preset_row:
+                await interaction.response.send_message(
+                    f"No preset named **{preset}** found. Use `/preset list` to see all presets.",
+                    ephemeral=True,
+                )
+                return
+            await interaction.response.defer(ephemeral=True)
+            await self._process_label_purchases(
+                interaction,
+                receipt_ids_str=receipt_ids,
+                carrier=preset_row["carrier"],
+                mail_class=preset_row["mail_class"],
+                weight_oz=preset_row["weight_oz"],
+                length_in=preset_row["length_in"],
+                width_in=preset_row["width_in"],
+                height_in=preset_row["height_in"],
+            )
+        else:
+            await interaction.response.send_modal(LabelModal(self, receipt_ids))
+
+    async def _process_label_purchases(
+        self,
+        interaction: discord.Interaction,
+        receipt_ids_str: str,
+        carrier: str,
+        mail_class: str,
+        weight_oz: float,
+        length_in: float,
+        width_in: float,
+        height_in: float,
+    ) -> None:
+        etsy, shop_id = await self._get_etsy_client(interaction)
+        if not etsy:
+            return
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            shop_row = await conn.execute("SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,))
+            shop_row = await shop_row.fetchone()
+        shop_name = shop_row["shop_name"] if shop_row else "My Shop"
+
+        raw_ids = [part.strip() for part in receipt_ids_str.split(",") if part.strip()]
+        receipt_ids: list[int] = []
+        for raw in raw_ids:
+            if not raw.isdigit():
+                await interaction.followup.send(
+                    f"`{raw}` is not a valid receipt ID.", ephemeral=True
+                )
+                return
+            receipt_ids.append(int(raw))
+
+        if not receipt_ids:
+            await interaction.followup.send("No receipt IDs provided.", ephemeral=True)
+            return
+
+        # Validate eligibility before purchasing any labels
+        receipt_rows: dict[int, any] = {}
+        async with db.get_db() as conn:
+            ineligible = []
+            for rid in receipt_ids:
+                cursor = await conn.execute(
+                    """
+                    SELECT receipt_id, is_paid, is_shipped,
+                           first_line, city, state, zip, country_iso
+                    FROM receipts WHERE receipt_id = ? AND shop_id = ?
+                    """,
+                    (rid, shop_id),
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    ineligible.append(f"#{rid}: not found")
+                elif not row["is_paid"]:
+                    ineligible.append(f"#{rid}: not paid")
+                elif row["is_shipped"]:
+                    ineligible.append(f"#{rid}: already shipped")
+                else:
+                    receipt_rows[rid] = row
+            if ineligible:
+                await interaction.followup.send(
+                    "The following orders are not eligible for a label:\n" +
+                    "\n".join(f"- {msg}" for msg in ineligible),
+                    ephemeral=True,
+                )
+                return
+
+        # USPS address verification — warn but do not block
+        address_warnings: list[str] = []
+        if _usps_client:
+            loop = asyncio.get_running_loop()
+            for rid, row in receipt_rows.items():
+                city = row["city"] or ""
+                state = row["state"] or ""
+                zip_code = row["zip"] or ""
+                street = row["first_line"] or ""
+                if not (street and city and state and zip_code):
+                    address_warnings.append(f"#{rid}: address incomplete, could not verify with USPS")
+                    continue
+                try:
+                    await loop.run_in_executor(
+                        None,
+                        lambda r=row: _usps_client.verify_address(
+                            street_address=r["first_line"] or "",
+                            city=r["city"] or "",
+                            state=r["state"] or "",
+                            zip_code=r["zip"] or "",
+                        ),
+                    )
+                except USPSAddressVerificationError as exc:
+                    address_warnings.append(f"#{rid}: {exc}")
+                except Exception as exc:
+                    print(f"[label] USPS verification failed for receipt {rid}: {exc}")
+                    # Don't warn on transient USPS API errors
+
+        if address_warnings:
+            warning_text = (
+                "**Address verification warning** — USPS could not confirm the following:\n" +
+                "\n".join(f"- {w}" for w in address_warnings) +
+                "\n\nYou can still proceed, but the label may be undeliverable."
+            )
+            await interaction.followup.send(warning_text, ephemeral=True)
+
+        loop = asyncio.get_running_loop()
+        results: list[dict] = []
+        errors: list[str] = []
+
+        for rid in receipt_ids:
+            try:
+                data = await loop.run_in_executor(
+                    None,
+                    lambda r=rid: etsy.create_shipping_label(
+                        shop_id, r, carrier, mail_class,
+                        weight_oz, length_in, width_in, height_in,
+                    ),
+                )
+                data["receipt_id"] = rid
+                results.append(data)
+            except Exception as exc:
+                err_str = str(exc)
+                if "403" in err_str or "transactions_rw" in err_str.lower():
+                    await interaction.followup.send(
+                        "Missing required scope. Run `/status` to re-authorize with label permissions.",
+                        ephemeral=True,
+                    )
+                    return
+                errors.append(f"#{rid}: {err_str}")
+
+        if results:
+            channel_id = guild_row["order_channel_id"] if guild_row else None
+            channel = self.get_channel(channel_id) if channel_id else interaction.channel
+            if channel:
+                await channel.send(embed=build_label_public_embed(results, shop_name))
+            try:
+                await interaction.user.send(embed=build_label_dm_embed(results, shop_name))
+            except discord.Forbidden:
+                await interaction.followup.send(
+                    "Labels purchased, but your DMs are closed — check your Etsy account for PDF links.",
+                    ephemeral=True,
+                )
+                return
+            msg = f"Label{'s' if len(results) != 1 else ''} purchased. Check your DMs for PDF links."
+            if errors:
+                msg += "\n\nFailed:\n" + "\n".join(f"- {e}" for e in errors)
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.followup.send(
+                "All label purchases failed:\n" + "\n".join(f"- {e}" for e in errors),
+                ephemeral=True,
+            )
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction
