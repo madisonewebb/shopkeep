@@ -103,15 +103,16 @@
 <body class="font-body text-sk-text antialiased" style="font-weight:450">
 
   <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="max-w-5xl mx-auto px-6 py-3 relative flex items-center justify-between">
       <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
-      <div class="hidden md:flex items-center gap-1">
+      <div class="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
         <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
         <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
         <a href="/about" class="px-3 py-1.5 text-sm text-sk-text rounded-md">About</a>
         <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
         <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
       </div>
+      <a href="{{ invite_url }}" class="btn-primary text-sm font-medium text-white px-4 py-1.5 rounded-lg">Add to Discord</a>
     </div>
   </nav>
 

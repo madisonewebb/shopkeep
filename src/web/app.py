@@ -64,15 +64,18 @@ def _user_id_from_token(access_token: str) -> str | None:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@app.route("/")
-def index():
-    invite_url = (
+def _invite_url() -> str:
+    return (
         f"https://discord.com/oauth2/authorize"
         f"?client_id={DISCORD_CLIENT_ID}"
         f"&permissions=19456"
         f"&scope=bot%20applications.commands"
     )
-    return render_template("index.html", invite_url=invite_url)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html", invite_url=_invite_url())
 
 
 @app.route("/connect/<setup_token>", methods=["GET", "POST"])
@@ -175,22 +178,22 @@ def etsy_callback():
 
 @app.route("/commands")
 def commands():
-    return render_template("commands.html")
+    return render_template("commands.html", invite_url=_invite_url())
 
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    return render_template("about.html", invite_url=_invite_url())
 
 
 @app.route("/privacy")
 def privacy():
-    return render_template("privacy.html")
+    return render_template("privacy.html", invite_url=_invite_url())
 
 
 @app.route("/terms")
 def terms():
-    return render_template("terms.html")
+    return render_template("terms.html", invite_url=_invite_url())
 
 
 @app.route("/health")

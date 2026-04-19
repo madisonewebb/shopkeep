@@ -98,15 +98,16 @@
 <body class="font-body text-sk-text antialiased" style="font-weight:450">
 
   <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="max-w-5xl mx-auto px-6 py-3 relative flex items-center justify-between">
       <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
-      <div class="hidden md:flex items-center gap-1">
+      <div class="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
         <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
         <a href="/commands" class="px-3 py-1.5 text-sm text-sk-text rounded-md">Commands</a>
         <a href="/about" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">About</a>
         <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
         <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
       </div>
+      <a href="{{ invite_url }}" class="btn-primary text-sm font-medium text-white px-4 py-1.5 rounded-lg">Add to Discord</a>
     </div>
   </nav>
 
@@ -162,7 +163,37 @@
 
         <div class="cmd-card">
           <code class="text-sk-lblue text-sm font-medium block mb-2">/preset add · /preset list · /preset remove</code>
-          <p class="text-sm text-sk-muted leading-relaxed">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when printing labels. Use <code class="text-sk-lblue">/preset list</code> to view all saved presets and <code class="text-sk-lblue">/preset remove</code> to delete one.</p>
+          <p class="text-sm text-sk-muted leading-relaxed">Manage reusable shipping package configurations. Save a preset with a name, carrier, mail class, weight, and dimensions — then reference it by name when buying labels. Use <code class="text-sk-lblue">/preset list</code> to view all saved presets and <code class="text-sk-lblue">/preset remove</code> to delete one.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/label [receipt_ids] [preset]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Purchase a shipping label for one or more orders. Omit receipt IDs to pick from an interactive list of open orders. Comma-separate IDs to buy in batch. Autocompletes both orders and presets.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/bestsellers [period] [ranked_by]</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Show your top 5 listings by units sold or revenue. Supports <code class="text-sk-lblue">this month</code>, <code class="text-sk-lblue">this year</code>, and <code class="text-sk-lblue">all time</code>. Computed from stored transaction history.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/reminders set · /reminders time · /reminders off · /reminders status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Configure shipping deadline reminders. On by default with a 1-day warning. Set multiple thresholds (e.g. <code class="text-sk-lblue">/reminders set 1 2</code>) and a preferred reminder time with <code class="text-sk-lblue">/reminders time</code>. Disable with <code class="text-sk-lblue">/reminders off</code>.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/backlog set · /backlog off · /backlog status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Get a one-time warning when open unshipped orders exceed a threshold (e.g. <code class="text-sk-lblue">/backlog set 10</code>). The alert resets automatically once the backlog clears.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/digest on · /digest time · /digest off · /digest status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Configure a daily morning summary of 24-hour orders and revenue, open order count, and upcoming ship deadlines. Timezone-aware — set your preferred delivery time with <code class="text-sk-lblue">/digest time</code>.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/goal set · /goal status · /goal off</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Set a monthly revenue target. The bot notifies you at 25%, 50%, 75%, and 100% milestones, and shows progress in the daily digest. Resets automatically each month.</p>
         </div>
       </div>
     </div>
