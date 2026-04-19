@@ -31,6 +31,18 @@ SETUP_TOKEN_TTL = 86400  # 24 hours
 
 _ORDERS_PAGE_SIZE = 5
 
+_PACKAGE_TYPES: list[tuple[str, str]] = [
+    ("PACKAGE", "Package (custom box/envelope)"),
+    ("LARGE_ENVELOPE", "Large Envelope"),
+    ("FLAT_RATE_ENVELOPE", "Flat Rate Envelope"),
+    ("FLAT_RATE_PADDED_ENVELOPE", "Flat Rate Padded Envelope"),
+    ("SMALL_FLAT_RATE_BOX", "Small Flat Rate Box"),
+    ("MEDIUM_FLAT_RATE_BOX", "Medium Flat Rate Box"),
+    ("LARGE_FLAT_RATE_BOX", "Large Flat Rate Box"),
+    ("REGIONAL_RATE_BOX_A", "Regional Rate Box A"),
+    ("REGIONAL_RATE_BOX_B", "Regional Rate Box B"),
+]
+
 
 class OrdersView(discord.ui.View):
     def __init__(self, pages: list[discord.Embed]):
@@ -208,6 +220,7 @@ class LabelSelectView(discord.ui.View):
                 length_in=self.preset_row["length_in"],
                 width_in=self.preset_row["width_in"],
                 height_in=self.preset_row["height_in"],
+                package_type=self.preset_row["package_type"] or "",
             )
         else:
             await interaction.response.send_modal(LabelModal(self.bot, receipt_ids_str))
@@ -249,10 +262,19 @@ class ImportPresetModal(discord.ui.Modal, title="Import Shipping Preset"):
         required=True,
     )
 
-    def __init__(self, bot: "ShopkeepBot", guild_id: int, profile_name: str, carrier_default: str, mail_class_default: str):
+    def __init__(
+        self,
+        bot: "ShopkeepBot",
+        guild_id: int,
+        profile_name: str,
+        carrier_default: str,
+        mail_class_default: str,
+        package_type: str = "",
+    ):
         super().__init__()
         self.bot = bot
         self.guild_id = guild_id
+        self._package_type = package_type
         self.name.default = profile_name[:64]
         self.carrier.default = carrier_default
         self.mail_class.default = mail_class_default
@@ -279,6 +301,7 @@ class ImportPresetModal(discord.ui.Modal, title="Import Shipping Preset"):
             inserted = await db.add_preset(
                 conn, self.guild_id, preset_name, carrier_val, mail_class_val,
                 weight_oz, length_in, width_in, height_in,
+                package_type=self._package_type,
             )
             await conn.commit()
 
@@ -295,6 +318,8 @@ class ImportPresetModal(discord.ui.Modal, title="Import Shipping Preset"):
         embed.add_field(name="Name", value=preset_name, inline=True)
         embed.add_field(name="Carrier", value=carrier_val, inline=True)
         embed.add_field(name="Mail Class", value=mail_class_val, inline=True)
+        if self._package_type:
+            embed.add_field(name="Package Type", value=self._package_type, inline=True)
         embed.add_field(name="Weight", value=f"{weight_lb:.2f} lb", inline=True)
         embed.add_field(name="Dimensions", value=dims_str, inline=True)
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -308,8 +333,9 @@ class ImportSelectView(discord.ui.View):
         self.profiles = profiles
         self.carrier_map = carrier_map
         self.selected: dict | None = None
+        self.selected_package_type: str = ""
 
-        options = [
+        profile_options = [
             discord.SelectOption(
                 label=p["title"][:100],
                 value=str(p["shipping_profile_id"]),
@@ -319,10 +345,25 @@ class ImportSelectView(discord.ui.View):
         ]
         self.select = discord.ui.Select(
             placeholder="Choose an Etsy shipping profile…",
-            options=options,
+            options=profile_options,
+            row=0,
         )
         self.select.callback = self._on_select
         self.add_item(self.select)
+
+        pkg_options = [
+            discord.SelectOption(label=label, value=value)
+            for value, label in _PACKAGE_TYPES
+        ]
+        self.pkg_select = discord.ui.Select(
+            placeholder="Package type (optional)…",
+            options=pkg_options,
+            min_values=0,
+            max_values=1,
+            row=1,
+        )
+        self.pkg_select.callback = self._on_pkg_select
+        self.add_item(self.pkg_select)
 
     def _describe(self, profile: dict) -> str:
         dests = profile.get("shipping_profile_destinations") or []
@@ -341,7 +382,11 @@ class ImportSelectView(discord.ui.View):
         )
         await interaction.response.defer_update()
 
-    @discord.ui.button(label="Import", style=discord.ButtonStyle.primary)
+    async def _on_pkg_select(self, interaction: discord.Interaction) -> None:
+        self.selected_package_type = self.pkg_select.values[0] if self.pkg_select.values else ""
+        await interaction.response.defer_update()
+
+    @discord.ui.button(label="Import", style=discord.ButtonStyle.primary, row=2)
     async def import_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         if not self.selected:
             await interaction.response.send_message(
@@ -361,10 +406,11 @@ class ImportSelectView(discord.ui.View):
             self.selected["title"],
             carrier_default,
             mail_class_default,
+            package_type=self.selected_package_type,
         )
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, row=2)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         self.stop()
         await interaction.response.edit_message(content="Canceled.", view=None)
@@ -1160,11 +1206,16 @@ class ShopkeepBot(discord.Client):
             mail_class="Shipping service (e.g. 'Priority Mail', 'First Class', 'Ground')",
             weight="Package weight (e.g. 0.3lb or 4.8oz)",
             dims="Package dimensions LxWxH in inches (e.g. 4x3x1)",
+            package_type="Package type (optional, e.g. PACKAGE, FLAT_RATE_ENVELOPE)",
         )
         @discord.app_commands.choices(carrier=[
             discord.app_commands.Choice(name="USPS", value="USPS"),
             discord.app_commands.Choice(name="UPS", value="UPS"),
             discord.app_commands.Choice(name="FedEx", value="FedEx"),
+        ])
+        @discord.app_commands.choices(package_type=[
+            discord.app_commands.Choice(name=label, value=value)
+            for value, label in _PACKAGE_TYPES
         ])
         async def preset_add(
             interaction: discord.Interaction,
@@ -1173,8 +1224,12 @@ class ShopkeepBot(discord.Client):
             mail_class: str,
             weight: str,
             dims: str,
+            package_type: str = "",
         ):
-            await self._cmd_preset_add(interaction, name=name, carrier=carrier, mail_class=mail_class, weight=weight, dims=dims)
+            await self._cmd_preset_add(
+                interaction, name=name, carrier=carrier, mail_class=mail_class,
+                weight=weight, dims=dims, package_type=package_type,
+            )
 
         @preset_group.command(name="list", description="List all saved shipping presets")
         async def preset_list(interaction: discord.Interaction):
@@ -1690,6 +1745,7 @@ class ShopkeepBot(discord.Client):
         mail_class: str,
         weight: str,
         dims: str,
+        package_type: str = "",
     ) -> None:
         await interaction.response.defer(ephemeral=True)
 
@@ -1712,6 +1768,7 @@ class ShopkeepBot(discord.Client):
             inserted = await db.add_preset(
                 conn, interaction.guild_id, name, carrier, mail_class,
                 weight_oz, length_in, width_in, height_in,
+                package_type=package_type,
             )
             await conn.commit()
 
@@ -1728,6 +1785,8 @@ class ShopkeepBot(discord.Client):
         embed.add_field(name="Name", value=name, inline=True)
         embed.add_field(name="Carrier", value=carrier, inline=True)
         embed.add_field(name="Mail Class", value=mail_class, inline=True)
+        if package_type:
+            embed.add_field(name="Package Type", value=package_type, inline=True)
         embed.add_field(name="Weight", value=f"{weight_lb:.2f} lb", inline=True)
         embed.add_field(name="Dimensions", value=dims_str, inline=True)
         await interaction.followup.send(embed=embed)
@@ -1752,9 +1811,13 @@ class ShopkeepBot(discord.Client):
         for p in presets:
             weight_lb = p["weight_oz"] / 16
             dims_str = f"{p['length_in']:g}×{p['width_in']:g}×{p['height_in']:g} in"
+            parts = [p["carrier"], p["mail_class"]]
+            if p["package_type"]:
+                parts.append(p["package_type"])
+            parts += [f"{weight_lb:.2f} lb", dims_str]
             embed.add_field(
                 name=p["name"],
-                value=f"{p['carrier']} · {p['mail_class']} · {weight_lb:.2f} lb · {dims_str}",
+                value=" · ".join(parts),
                 inline=False,
             )
         await interaction.followup.send(embed=embed)
@@ -2308,6 +2371,7 @@ class ShopkeepBot(discord.Client):
                 length_in=preset_row["length_in"],
                 width_in=preset_row["width_in"],
                 height_in=preset_row["height_in"],
+                package_type=preset_row["package_type"] or "",
             )
         else:
             await interaction.response.send_modal(LabelModal(self, receipt_ids))
@@ -2322,6 +2386,7 @@ class ShopkeepBot(discord.Client):
         length_in: float,
         width_in: float,
         height_in: float,
+        package_type: str = "",
     ) -> None:
         etsy, shop_id = await self._get_etsy_client(interaction)
         if not etsy:
@@ -2424,6 +2489,7 @@ class ShopkeepBot(discord.Client):
                     lambda r=rid: etsy.create_shipping_label(
                         shop_id, r, carrier, mail_class,
                         weight_oz, length_in, width_in, height_in,
+                        package_type=package_type,
                     ),
                 )
                 data["receipt_id"] = rid

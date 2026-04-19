@@ -162,18 +162,22 @@ class EtsyClient:
         length_in: float,
         width_in: float,
         height_in: float,
+        package_type: str = "",
     ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "carrier_name": carrier_name,
+            "mail_class": mail_class,
+            "weight": weight_oz,
+            "weight_unit": "oz",
+            "length": length_in,
+            "width": width_in,
+            "height": height_in,
+            "dimension_unit": "in",
+        }
+        if package_type:
+            payload["package_type"] = package_type
         return self._request(
             "POST",
             f"/application/shops/{shop_id}/receipts/{receipt_id}/shipping-labels",
-            json={
-                "carrier_name": carrier_name,
-                "mail_class": mail_class,
-                "weight": weight_oz,
-                "weight_unit": "oz",
-                "length": length_in,
-                "width": width_in,
-                "height": height_in,
-                "dimension_unit": "in",
-            },
+            json=payload,
         )

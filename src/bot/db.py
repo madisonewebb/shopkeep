@@ -98,16 +98,17 @@ CREATE TABLE IF NOT EXISTS listings (
 
 _CREATE_SHIPPING_PRESETS = """
 CREATE TABLE IF NOT EXISTS shipping_presets (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    guild_id   INTEGER NOT NULL REFERENCES guilds(guild_id),
-    name       TEXT    NOT NULL,
-    carrier    TEXT    NOT NULL,
-    mail_class TEXT    NOT NULL,
-    weight_oz  REAL    NOT NULL,
-    length_in  REAL    NOT NULL,
-    width_in   REAL    NOT NULL,
-    height_in  REAL    NOT NULL,
-    created_at INTEGER NOT NULL,
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id     INTEGER NOT NULL REFERENCES guilds(guild_id),
+    name         TEXT    NOT NULL,
+    carrier      TEXT    NOT NULL,
+    mail_class   TEXT    NOT NULL,
+    package_type TEXT    NOT NULL DEFAULT '',
+    weight_oz    REAL    NOT NULL,
+    length_in    REAL    NOT NULL,
+    width_in     REAL    NOT NULL,
+    height_in    REAL    NOT NULL,
+    created_at   INTEGER NOT NULL,
     UNIQUE(guild_id, name)
 )
 """
@@ -275,6 +276,12 @@ async def init_db() -> None:
             pass  # column already exists
         try:
             await db.execute("ALTER TABLE receipts ADD COLUMN second_line TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute(
+                "ALTER TABLE shipping_presets ADD COLUMN package_type TEXT NOT NULL DEFAULT ''"
+            )
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -893,15 +900,16 @@ async def add_preset(
     length_in: float,
     width_in: float,
     height_in: float,
+    package_type: str = "",
 ) -> bool:
     """Insert a new preset. Returns True if inserted, False if name already exists."""
     cursor = await db.execute(
         """
         INSERT OR IGNORE INTO shipping_presets
-            (guild_id, name, carrier, mail_class, weight_oz, length_in, width_in, height_in, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (guild_id, name, carrier, mail_class, package_type, weight_oz, length_in, width_in, height_in, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (guild_id, name, carrier, mail_class, weight_oz, length_in, width_in, height_in, int(time.time())),
+        (guild_id, name, carrier, mail_class, package_type, weight_oz, length_in, width_in, height_in, int(time.time())),
     )
     return cursor.rowcount == 1
 
