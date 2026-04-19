@@ -142,6 +142,16 @@ class EtsyClient:
         params = {"limit": limit, "offset": offset, "state": state, "includes": ["Images"]}
         return self._request("GET", f"/application/shops/{shop_id}/listings", params=params)
 
+    def get_shipping_profiles(self, shop_id: int) -> Dict[str, Any]:
+        return self._request("GET", f"/application/shops/{shop_id}/shipping-profiles")
+
+    def get_shipping_carriers(self, origin_country_iso: str = "US") -> Dict[str, Any]:
+        return self._request(
+            "GET",
+            "/application/shipping-carriers",
+            params={"origin_country_iso": origin_country_iso},
+        )
+
     def create_shipping_label(
         self,
         shop_id: int,

@@ -222,6 +222,158 @@ class LabelSelectView(discord.ui.View):
             item.disabled = True
 
 
+class ImportPresetModal(discord.ui.Modal, title="Import Shipping Preset"):
+    name = discord.ui.TextInput(label="Preset Name", max_length=64, required=True)
+    carrier = discord.ui.TextInput(
+        label="Carrier",
+        placeholder="USPS, UPS, FedEx",
+        max_length=20,
+        required=True,
+    )
+    mail_class = discord.ui.TextInput(
+        label="Mail Class",
+        placeholder="e.g. Priority Mail, First Class, Ground",
+        max_length=64,
+        required=True,
+    )
+    weight = discord.ui.TextInput(
+        label="Weight",
+        placeholder="e.g. 4oz or 0.3lb",
+        max_length=20,
+        required=True,
+    )
+    dims = discord.ui.TextInput(
+        label="Dimensions (LxWxH in inches)",
+        placeholder="e.g. 6x4x2",
+        max_length=30,
+        required=True,
+    )
+
+    def __init__(self, bot: "ShopkeepBot", guild_id: int, profile_name: str, carrier_default: str, mail_class_default: str):
+        super().__init__()
+        self.bot = bot
+        self.guild_id = guild_id
+        self.name.default = profile_name[:64]
+        self.carrier.default = carrier_default
+        self.mail_class.default = mail_class_default
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        weight_oz = _parse_weight_oz(self.weight.value)
+        if weight_oz is None or weight_oz <= 0:
+            await interaction.response.send_message(
+                "Invalid weight. Use a format like `4oz`, `0.3lb`, or `5` (oz).", ephemeral=True
+            )
+            return
+        parsed_dims = _parse_dims(self.dims.value)
+        if parsed_dims is None:
+            await interaction.response.send_message(
+                "Invalid dimensions. Use `LxWxH` in inches, e.g. `6x4x2`.", ephemeral=True
+            )
+            return
+        length_in, width_in, height_in = parsed_dims
+        preset_name = self.name.value.strip()
+        carrier_val = self.carrier.value.strip()
+        mail_class_val = self.mail_class.value.strip()
+
+        async with db.get_db() as conn:
+            inserted = await db.add_preset(
+                conn, self.guild_id, preset_name, carrier_val, mail_class_val,
+                weight_oz, length_in, width_in, height_in,
+            )
+            await conn.commit()
+
+        if not inserted:
+            await interaction.response.send_message(
+                f"A preset named **{preset_name}** already exists. Remove it first with `/preset remove`.",
+                ephemeral=True,
+            )
+            return
+
+        weight_lb = weight_oz / 16
+        dims_str = f"{length_in:g}×{width_in:g}×{height_in:g} in"
+        embed = discord.Embed(title="Preset Imported", color=discord.Color.green())
+        embed.add_field(name="Name", value=preset_name, inline=True)
+        embed.add_field(name="Carrier", value=carrier_val, inline=True)
+        embed.add_field(name="Mail Class", value=mail_class_val, inline=True)
+        embed.add_field(name="Weight", value=f"{weight_lb:.2f} lb", inline=True)
+        embed.add_field(name="Dimensions", value=dims_str, inline=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class ImportSelectView(discord.ui.View):
+    def __init__(self, bot: "ShopkeepBot", guild_id: int, profiles: list, carrier_map: dict[int, str]):
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.profiles = profiles
+        self.carrier_map = carrier_map
+        self.selected: dict | None = None
+
+        options = [
+            discord.SelectOption(
+                label=p["title"][:100],
+                value=str(p["shipping_profile_id"]),
+                description=self._describe(p)[:100],
+            )
+            for p in profiles[:25]
+        ]
+        self.select = discord.ui.Select(
+            placeholder="Choose an Etsy shipping profile…",
+            options=options,
+        )
+        self.select.callback = self._on_select
+        self.add_item(self.select)
+
+    def _describe(self, profile: dict) -> str:
+        dests = profile.get("shipping_profile_destinations") or []
+        if not dests:
+            return "No destinations set"
+        d = dests[0]
+        carrier = self.carrier_map.get(d.get("shipping_carrier_id", 0), "")
+        mail = d.get("mail_class") or ""
+        parts = [x for x in [carrier, mail] if x]
+        return " · ".join(parts) if parts else "Carrier not set"
+
+    async def _on_select(self, interaction: discord.Interaction) -> None:
+        profile_id = int(self.select.values[0])
+        self.selected = next(
+            (p for p in self.profiles if p["shipping_profile_id"] == profile_id), None
+        )
+        await interaction.response.defer_update()
+
+    @discord.ui.button(label="Import", style=discord.ButtonStyle.primary)
+    async def import_btn(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not self.selected:
+            await interaction.response.send_message(
+                "Select a profile first.", ephemeral=True
+            )
+            return
+        dests = self.selected.get("shipping_profile_destinations") or []
+        carrier_default = ""
+        mail_class_default = ""
+        if dests:
+            d = dests[0]
+            carrier_default = self.carrier_map.get(d.get("shipping_carrier_id", 0), "")
+            mail_class_default = d.get("mail_class") or ""
+        modal = ImportPresetModal(
+            self.bot,
+            self.guild_id,
+            self.selected["title"],
+            carrier_default,
+            mail_class_default,
+        )
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.edit_message(content="Canceled.", view=None)
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+
+
 def _ship_deadline_str(expected_ship_date: int | None) -> str | None:
     if not expected_ship_date:
         return None
@@ -1033,6 +1185,10 @@ class ShopkeepBot(discord.Client):
         async def preset_remove(interaction: discord.Interaction, name: str):
             await self._cmd_preset_remove(interaction, name=name)
 
+        @preset_group.command(name="import", description="Import a shipping profile from your Etsy shop as a preset")
+        async def preset_import(interaction: discord.Interaction):
+            await self._cmd_preset_import(interaction)
+
         tree.add_command(preset_group)
 
         reminders_group = discord.app_commands.Group(
@@ -1235,7 +1391,7 @@ class ShopkeepBot(discord.Client):
             ("/listings", "Browse your active Etsy listings"),
             ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
             ("/label [receipt_ids] [preset]", "Buy shipping labels — omit receipt IDs to pick from a list"),
-            ("/preset add/list/remove", "Manage shipping presets (carrier, service, weight, dims)"),
+            ("/preset add/list/remove/import", "Manage shipping presets — import pulls from your Etsy shipping profiles"),
             ("/reminders set/time/off/status", "Configure shipping deadline reminders"),
             ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
             ("/digest on/time/off/status", "Configure the daily order digest"),
@@ -1618,6 +1774,53 @@ class ShopkeepBot(discord.Client):
             return
 
         await interaction.followup.send(f"Preset **{name}** removed.", ephemeral=True)
+
+    async def _cmd_preset_import(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        loop = asyncio.get_event_loop()
+        etsy, shop_id = await self._get_etsy_client(interaction)
+        if not etsy:
+            return
+
+        try:
+            profiles_data = await loop.run_in_executor(
+                None, lambda: etsy.get_shipping_profiles(shop_id)
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                f"Failed to fetch Etsy shipping profiles: {exc}", ephemeral=True
+            )
+            return
+
+        profiles = profiles_data.get("results") or []
+        if not profiles:
+            await interaction.followup.send(
+                "No shipping profiles found on your Etsy shop.", ephemeral=True
+            )
+            return
+
+        # Determine origin country from the first profile so we can look up carrier names
+        origin_iso = (profiles[0].get("origin_country_iso") or "US").upper()
+        carrier_map: dict[int, str] = {}
+        try:
+            carriers_data = await loop.run_in_executor(
+                None, lambda: etsy.get_shipping_carriers(origin_iso)
+            )
+            carrier_map = {
+                c["shipping_carrier_id"]: c["name"]
+                for c in (carriers_data.get("results") or [])
+            }
+        except Exception:
+            pass  # non-fatal; modal fields remain editable
+
+        view = ImportSelectView(self, interaction.guild_id, profiles, carrier_map)
+        await interaction.followup.send(
+            f"Found **{len(profiles)}** shipping profile{'s' if len(profiles) != 1 else ''} on your Etsy shop.\n"
+            "Select one to import as a preset, then fill in the package dimensions and weight.",
+            view=view,
+            ephemeral=True,
+        )
 
     async def _cmd_reminders_set(self, interaction: discord.Interaction, days: str) -> None:
         if not interaction.user.guild_permissions.manage_guild:
