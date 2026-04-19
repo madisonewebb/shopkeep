@@ -1224,7 +1224,7 @@ class ShopkeepBot(discord.Client):
 
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
-        commands = [
+        sections = [
             ("/help", "List all commands"),
             ("/status", "Show Etsy connection and notification channel"),
             ("/setchannel", "Set this channel for order notifications"),
@@ -1233,27 +1233,15 @@ class ShopkeepBot(discord.Client):
             ("/disconnect", "Unlink your Etsy shop from this server"),
             ("/revenue [period]", "Show revenue summary (default: this month)"),
             ("/listings", "Browse your active Etsy listings"),
-            ("/preset add", "Save a new shipping preset (carrier, service, weight, dims)"),
-            ("/preset list", "List all saved shipping presets"),
-            ("/preset remove", "Delete a saved shipping preset"),
-            ("/reminders set", "Enable shipping deadline reminders (0=today, 1=tomorrow, etc.)"),
-            ("/reminders time", "Set the time of day reminders fire (e.g. 09:00 America/New_York)"),
-            ("/reminders off", "Disable all shipping deadline reminders"),
-            ("/reminders status", "Show the current shipping reminder configuration"),
-            ("/backlog set <n>", "Alert when open unshipped orders exceed a threshold"),
-            ("/backlog off", "Disable the order backlog warning"),
-            ("/backlog status", "Show the current backlog warning configuration"),
-            ("/digest on", "Enable the daily digest (default: 9:00 AM UTC)"),
-            ("/digest time", "Set the time and timezone for the daily digest"),
-            ("/digest off", "Disable the daily digest"),
-            ("/digest status", "Show the current daily digest configuration"),
-            ("/goal set <amount>", "Set a monthly revenue goal (notifies at 25/50/75/100%)"),
-            ("/goal status", "Show current progress toward your monthly goal"),
-            ("/goal off", "Remove the monthly revenue goal"),
             ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
             ("/label [receipt_ids] [preset]", "Buy shipping labels — omit receipt IDs to pick from a list"),
+            ("/preset add/list/remove", "Manage shipping presets (carrier, service, weight, dims)"),
+            ("/reminders set/time/off/status", "Configure shipping deadline reminders"),
+            ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
+            ("/digest on/time/off/status", "Configure the daily order digest"),
+            ("/goal set/status/off", "Set and track a monthly revenue goal"),
         ]
-        for name, desc in commands:
+        for name, desc in sections:
             embed.add_field(name=name, value=desc, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
