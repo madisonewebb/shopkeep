@@ -161,6 +161,67 @@ class LabelModal(discord.ui.Modal):
         )
 
 
+class LabelSelectView(discord.ui.View):
+    def __init__(self, bot: "ShopkeepBot", receipts: list, preset_row: dict | None):
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.preset_row = preset_row
+        self.selected_ids: list[str] = []
+
+        options = [
+            discord.SelectOption(
+                label=f"#{r['receipt_id']} — {r['name'] or 'Unknown buyer'}"[:100],
+                value=str(r["receipt_id"]),
+            )
+            for r in receipts
+        ]
+        self.select = discord.ui.Select(
+            placeholder="Pick orders to label…",
+            min_values=1,
+            max_values=min(len(options), 25),
+            options=options,
+        )
+        self.select.callback = self._on_select
+        self.add_item(self.select)
+
+    async def _on_select(self, interaction: discord.Interaction) -> None:
+        self.selected_ids = self.select.values
+        await interaction.response.defer_update()
+
+    @discord.ui.button(label="Buy Labels", style=discord.ButtonStyle.primary)
+    async def buy(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not self.selected_ids:
+            await interaction.response.send_message(
+                "Select at least one order first.", ephemeral=True
+            )
+            return
+        self.stop()
+        receipt_ids_str = ",".join(self.selected_ids)
+        if self.preset_row:
+            await interaction.response.defer(ephemeral=True)
+            await self.bot._process_label_purchases(
+                interaction,
+                receipt_ids_str=receipt_ids_str,
+                carrier=self.preset_row["carrier"],
+                mail_class=self.preset_row["mail_class"],
+                weight_oz=self.preset_row["weight_oz"],
+                length_in=self.preset_row["length_in"],
+                width_in=self.preset_row["width_in"],
+                height_in=self.preset_row["height_in"],
+            )
+        else:
+            await interaction.response.send_modal(LabelModal(self.bot, receipt_ids_str))
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.edit_message(content="Canceled.", view=None)
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+
+
 def _ship_deadline_str(expected_ship_date: int | None) -> str | None:
     if not expected_ship_date:
         return None
@@ -1110,7 +1171,7 @@ class ShopkeepBot(discord.Client):
 
         @tree.command(name="label", description="Buy a shipping label for one or more orders")
         @discord.app_commands.describe(
-            receipt_ids="Order receipt ID(s) — comma-separate for batch (e.g. 12345 or 12345,67890)",
+            receipt_ids="Order receipt ID(s) — omit to pick from a list, or comma-separate for batch",
             preset="Shipping preset to use — skips manual entry",
         )
         @discord.app_commands.autocomplete(
@@ -1119,7 +1180,7 @@ class ShopkeepBot(discord.Client):
         )
         async def label(
             interaction: discord.Interaction,
-            receipt_ids: str,
+            receipt_ids: str = "",
             preset: str = "",
         ):
             await self._cmd_label(interaction, receipt_ids=receipt_ids, preset=preset)
@@ -1190,7 +1251,7 @@ class ShopkeepBot(discord.Client):
             ("/goal status", "Show current progress toward your monthly goal"),
             ("/goal off", "Remove the monthly revenue goal"),
             ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
-            ("/label <receipt_ids> [preset]", "Buy a shipping label — comma-separate IDs for batch"),
+            ("/label [receipt_ids] [preset]", "Buy shipping labels — omit receipt IDs to pick from a list"),
         ]
         for name, desc in commands:
             embed.add_field(name=name, value=desc, inline=False)
@@ -2010,9 +2071,10 @@ class ShopkeepBot(discord.Client):
     async def _cmd_label(
         self,
         interaction: discord.Interaction,
-        receipt_ids: str,
+        receipt_ids: str = "",
         preset: str = "",
     ) -> None:
+        preset_row = None
         if preset:
             async with db.get_db() as conn:
                 preset_row = await db.get_preset_by_name(conn, interaction.guild_id, preset)
@@ -2022,6 +2084,29 @@ class ShopkeepBot(discord.Client):
                     ephemeral=True,
                 )
                 return
+
+        if not receipt_ids:
+            # Show multi-select picker
+            etsy, shop_id = await self._get_etsy_client_silent(interaction)
+            if not etsy:
+                await interaction.response.send_message(
+                    "No Etsy shop connected. Run `/status` to get started.", ephemeral=True
+                )
+                return
+            async with db.get_db() as conn:
+                receipts = await db.get_labelable_receipts(conn, shop_id)
+            if not receipts:
+                await interaction.response.send_message(
+                    "No paid, unshipped orders found.", ephemeral=True
+                )
+                return
+            view = LabelSelectView(self, receipts, preset_row)
+            await interaction.response.send_message(
+                "Select the orders you want to label:", view=view, ephemeral=True
+            )
+            return
+
+        if preset_row:
             await interaction.response.defer(ephemeral=True)
             await self._process_label_purchases(
                 interaction,
@@ -2184,6 +2269,19 @@ class ShopkeepBot(discord.Client):
                 "All label purchases failed:\n" + "\n".join(f"- {e}" for e in errors),
                 ephemeral=True,
             )
+
+    async def _get_etsy_client_silent(
+        self, interaction: discord.Interaction
+    ) -> tuple[EtsyClient | None, int | None]:
+        """Return (EtsyClient, shop_id) without sending any response — caller handles errors."""
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+        if not guild_row or not guild_row["etsy_shop_id"]:
+            return None, None
+        etsy = self.etsy_clients.get(interaction.guild_id)
+        if not etsy:
+            return None, None
+        return etsy, guild_row["etsy_shop_id"]
 
     async def _get_etsy_client(
         self, interaction: discord.Interaction
