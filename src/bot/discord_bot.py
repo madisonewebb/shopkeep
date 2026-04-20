@@ -173,6 +173,84 @@ class LabelModal(discord.ui.Modal):
         )
 
 
+class LabelWeightModal(discord.ui.Modal):
+    weight = discord.ui.TextInput(
+        label="Weight",
+        placeholder="e.g. 4oz or 0.3lb",
+        required=True,
+        max_length=20,
+    )
+
+    def __init__(self, bot: "ShopkeepBot", receipt_ids_str: str, preset_row):
+        super().__init__(title="Confirm Weight")
+        self.bot = bot
+        self.receipt_ids_str = receipt_ids_str
+        self.preset_row = preset_row
+        self.weight.default = f"{preset_row['weight_oz']:g}oz"
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        weight_oz = _parse_weight_oz(self.weight.value)
+        if weight_oz is None or weight_oz <= 0:
+            await interaction.response.send_message(
+                "Invalid weight. Use a format like `4oz`, `0.3lb`, or `5` (oz).", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.bot._process_label_purchases(
+            interaction,
+            receipt_ids_str=self.receipt_ids_str,
+            carrier=self.preset_row["carrier"],
+            mail_class=self.preset_row["mail_class"],
+            weight_oz=weight_oz,
+            length_in=self.preset_row["length_in"],
+            width_in=self.preset_row["width_in"],
+            height_in=self.preset_row["height_in"],
+            package_type=self.preset_row["package_type"] or "",
+        )
+
+
+class LabelPresetView(discord.ui.View):
+    def __init__(self, bot: "ShopkeepBot", receipt_ids_str: str, presets: list):
+        super().__init__(timeout=120)
+        self.bot = bot
+        self.receipt_ids_str = receipt_ids_str
+        self.presets = {p["name"]: p for p in presets}
+        self.selected_name: str | None = None
+
+        options = [discord.SelectOption(label=p["name"], value=p["name"]) for p in presets]
+        self.select = discord.ui.Select(
+            placeholder="Choose a preset…",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+        self.select.callback = self._on_select
+        self.add_item(self.select)
+
+    async def _on_select(self, interaction: discord.Interaction) -> None:
+        self.selected_name = self.select.values[0]
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Use Preset", style=discord.ButtonStyle.primary)
+    async def use_preset(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not self.selected_name:
+            await interaction.response.send_message("Select a preset first.", ephemeral=True)
+            return
+        self.stop()
+        await interaction.response.send_modal(
+            LabelWeightModal(self.bot, self.receipt_ids_str, self.presets[self.selected_name])
+        )
+
+    @discord.ui.button(label="Enter Manually", style=discord.ButtonStyle.secondary)
+    async def enter_manually(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.send_modal(LabelModal(self.bot, self.receipt_ids_str))
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+
+
 class LabelSelectView(discord.ui.View):
     def __init__(self, bot: "ShopkeepBot", receipts: list, preset_row: dict | None):
         super().__init__(timeout=120)
@@ -210,20 +288,19 @@ class LabelSelectView(discord.ui.View):
         self.stop()
         receipt_ids_str = ",".join(self.selected_ids)
         if self.preset_row:
-            await interaction.response.defer(ephemeral=True)
-            await self.bot._process_label_purchases(
-                interaction,
-                receipt_ids_str=receipt_ids_str,
-                carrier=self.preset_row["carrier"],
-                mail_class=self.preset_row["mail_class"],
-                weight_oz=self.preset_row["weight_oz"],
-                length_in=self.preset_row["length_in"],
-                width_in=self.preset_row["width_in"],
-                height_in=self.preset_row["height_in"],
-                package_type=self.preset_row["package_type"] or "",
+            await interaction.response.send_modal(
+                LabelWeightModal(self.bot, receipt_ids_str, self.preset_row)
             )
         else:
-            await interaction.response.send_modal(LabelModal(self.bot, receipt_ids_str))
+            async with db.get_db() as conn:
+                presets = await db.list_presets(conn, interaction.guild_id)
+            if presets:
+                await interaction.response.edit_message(
+                    content="Choose a preset or enter shipping details manually:",
+                    view=LabelPresetView(self.bot, receipt_ids_str, presets),
+                )
+            else:
+                await interaction.response.send_modal(LabelModal(self.bot, receipt_ids_str))
 
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
