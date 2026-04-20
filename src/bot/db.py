@@ -113,6 +113,21 @@ CREATE TABLE IF NOT EXISTS shipping_presets (
 )
 """
 
+_CREATE_SHIPPO_KEYS = """
+CREATE TABLE IF NOT EXISTS shippo_keys (
+    guild_id     INTEGER PRIMARY KEY REFERENCES guilds(guild_id),
+    api_key      TEXT    NOT NULL,
+    addr_name    TEXT,
+    addr_street1 TEXT,
+    addr_street2 TEXT,
+    addr_city    TEXT,
+    addr_state   TEXT,
+    addr_zip     TEXT,
+    addr_country TEXT    NOT NULL DEFAULT 'US',
+    created_at   INTEGER NOT NULL
+)
+"""
+
 _CREATE_RECEIPTS = """
 CREATE TABLE IF NOT EXISTS receipts (
     receipt_id            INTEGER PRIMARY KEY,
@@ -210,6 +225,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_SHIPPING_REMINDERS)
         await db.execute(_CREATE_TRANSACTIONS)
         await db.execute(_CREATE_REVIEWS)
+        await db.execute(_CREATE_SHIPPO_KEYS)
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
         except Exception:
@@ -1226,3 +1242,56 @@ async def disconnect_guild(
         """,
         (new_setup_token, new_setup_token_exp, guild_id),
     )
+
+
+# ── Shippo helpers ────────────────────────────────────────────────────────────
+
+async def get_shippo_config(db: aiosqlite.Connection, guild_id: int):
+    cursor = await db.execute("SELECT * FROM shippo_keys WHERE guild_id = ?", (guild_id,))
+    return await cursor.fetchone()
+
+
+async def save_shippo_key(db: aiosqlite.Connection, guild_id: int, api_key: str) -> None:
+    await db.execute(
+        """
+        INSERT INTO shippo_keys (guild_id, api_key, created_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET api_key = excluded.api_key
+        """,
+        (guild_id, api_key, int(time.time())),
+    )
+
+
+async def save_shippo_address(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    name: str,
+    street1: str,
+    street2: str,
+    city: str,
+    state: str,
+    zip_code: str,
+    country: str,
+) -> None:
+    await db.execute(
+        """
+        INSERT INTO shippo_keys (guild_id, api_key, addr_name, addr_street1, addr_street2,
+                                 addr_city, addr_state, addr_zip, addr_country, created_at)
+        VALUES (?, COALESCE((SELECT api_key FROM shippo_keys WHERE guild_id = ?), ''),
+                ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(guild_id) DO UPDATE SET
+            addr_name    = excluded.addr_name,
+            addr_street1 = excluded.addr_street1,
+            addr_street2 = excluded.addr_street2,
+            addr_city    = excluded.addr_city,
+            addr_state   = excluded.addr_state,
+            addr_zip     = excluded.addr_zip,
+            addr_country = excluded.addr_country
+        """,
+        (guild_id, guild_id, name, street1, street2, city, state, zip_code, country,
+         int(time.time())),
+    )
+
+
+async def delete_shippo_config(db: aiosqlite.Connection, guild_id: int) -> None:
+    await db.execute("DELETE FROM shippo_keys WHERE guild_id = ?", (guild_id,))

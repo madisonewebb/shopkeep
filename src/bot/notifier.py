@@ -594,7 +594,7 @@ def build_label_dm_embed(
         if pdf_url:
             value = f"[Download PDF]({pdf_url})\nTracking: `{tracking}`"
         else:
-            value = f"Tracking: `{tracking}`\n*(PDF URL not returned by Etsy — check your Etsy account)*"
+            value = f"Tracking: `{tracking}`"
         embed.add_field(name=f"Order #{receipt_id}", value=value, inline=False)
     embed.set_footer(text=shop_name)
     return embed

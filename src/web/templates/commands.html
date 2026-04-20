@@ -167,8 +167,13 @@
         </div>
 
         <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/shippo connect · /shippo address · /shippo status · /shippo disconnect</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Connect your <a href="https://goshippo.com" class="underline hover:text-sk-text">Shippo</a> account for label purchasing. Run <code class="text-sk-lblue">/shippo connect</code> with your API key, then <code class="text-sk-lblue">/shippo address</code> to set your ship-from address. Each Discord server uses its own Shippo account.</p>
+        </div>
+
+        <div class="cmd-card">
           <code class="text-sk-lblue text-sm font-medium block mb-2">/label [receipt_ids] [preset]</code>
-          <p class="text-sm text-sk-muted leading-relaxed">Purchase a shipping label for one or more orders. Omit receipt IDs to pick from an interactive list of open orders. Comma-separate IDs to buy in batch. Autocompletes both orders and presets.</p>
+          <p class="text-sm text-sk-muted leading-relaxed">Purchase a shipping label via Shippo for one or more orders. Omit receipt IDs to pick from an interactive list of open orders. Comma-separate IDs to buy in batch. If a preset's carrier and service match a Shippo rate, the label is bought automatically — otherwise a rate picker is shown.</p>
         </div>
 
         <div class="cmd-card">

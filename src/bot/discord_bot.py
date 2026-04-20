@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from src.bot import db
 from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
+from src.shippo.client import ShippoClient
 from src.usps.client import USPSAddressVerificationError, USPSClient
 
 load_dotenv()
@@ -249,6 +250,130 @@ class LabelPresetView(discord.ui.View):
     async def on_timeout(self) -> None:
         for item in self.children:
             item.disabled = True
+
+
+class ShippoAddressModal(discord.ui.Modal, title="Ship-From Address"):
+    addr_name = discord.ui.TextInput(label="Name or Company", max_length=100, placeholder="e.g. Madi's Crafts")
+    street1 = discord.ui.TextInput(label="Street Address", max_length=100, placeholder="e.g. 123 Main St")
+    city = discord.ui.TextInput(label="City", max_length=60, placeholder="e.g. San Francisco")
+    state = discord.ui.TextInput(label="State (2-letter code)", max_length=2, placeholder="e.g. CA")
+    zip_code = discord.ui.TextInput(label="ZIP Code", max_length=10, placeholder="e.g. 94117")
+
+    def __init__(self, bot: "ShopkeepBot"):
+        super().__init__()
+        self.bot = bot
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            await db.save_shippo_address(
+                conn,
+                interaction.guild_id,
+                name=self.addr_name.value.strip(),
+                street1=self.street1.value.strip(),
+                street2="",
+                city=self.city.value.strip(),
+                state=self.state.value.strip().upper(),
+                zip_code=self.zip_code.value.strip(),
+                country="US",
+            )
+            await conn.commit()
+        await interaction.response.send_message("Return address saved.", ephemeral=True)
+
+
+class RateSelectView(discord.ui.View):
+    def __init__(
+        self,
+        bot: "ShopkeepBot",
+        receipt_shipments: list,
+        shop_id: int,
+        shop_name: str,
+        etsy: EtsyClient,
+        guild_row,
+        shippo: ShippoClient,
+        loop,
+    ):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.receipt_shipments = receipt_shipments  # list of (receipt_id, rates_list)
+        self.shop_id = shop_id
+        self.shop_name = shop_name
+        self.etsy = etsy
+        self.guild_row = guild_row
+        self.shippo = shippo
+        self.loop = loop
+        self.selected_object_id: str | None = None
+
+        _, first_rates = receipt_shipments[0]
+        sorted_rates = sorted(first_rates, key=lambda r: float(r.get("amount", 999)))[:25]
+        self._rates_by_id = {r["object_id"]: r for r in sorted_rates}
+
+        if sorted_rates:
+            sel = discord.ui.Select(
+                placeholder="Choose a shipping service…",
+                options=[
+                    discord.SelectOption(label=ShippoClient.fmt_rate(r), value=r["object_id"])
+                    for r in sorted_rates
+                ],
+            )
+            sel.callback = self._on_select
+            self.add_item(sel)
+
+    async def _on_select(self, interaction: discord.Interaction) -> None:
+        self.selected_object_id = interaction.data["values"][0]
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Buy Label", style=discord.ButtonStyle.green)
+    async def buy(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not self.selected_object_id:
+            await interaction.response.send_message("Pick a shipping service first.", ephemeral=True)
+            return
+        self.stop()
+        await interaction.response.edit_message(content="Buying labels…", view=None)
+
+        selected_rate = self._rates_by_id.get(self.selected_object_id)
+        selected_token = (selected_rate.get("servicelevel") or {}).get("token") if selected_rate else None
+
+        # Build rate_map: find matching service level for every receipt
+        rate_map: dict[int, dict] = {}
+        errors: list[str] = []
+        for rid, rates in self.receipt_shipments:
+            if rid == self.receipt_shipments[0][0] and selected_rate:
+                rate_map[rid] = selected_rate
+            elif selected_token:
+                match = next(
+                    (r for r in rates
+                     if (r.get("servicelevel") or {}).get("token") == selected_token),
+                    None,
+                )
+                if match:
+                    rate_map[rid] = match
+                else:
+                    cheapest = min(rates, key=lambda r: float(r.get("amount", 999)), default=None)
+                    if cheapest:
+                        rate_map[rid] = cheapest
+                    else:
+                        errors.append(f"#{rid}: no rates available")
+            else:
+                cheapest = min(rates, key=lambda r: float(r.get("amount", 999)), default=None)
+                if cheapest:
+                    rate_map[rid] = cheapest
+                else:
+                    errors.append(f"#{rid}: no rates available")
+
+        if errors and not rate_map:
+            await interaction.followup.send(
+                "Could not find rates:\n" + "\n".join(f"- {e}" for e in errors), ephemeral=True
+            )
+            return
+
+        await self.bot._execute_label_purchases(
+            interaction, rate_map, self.etsy, self.shop_id, self.guild_row, self.shop_name, self.shippo, self.loop
+        )
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.edit_message(content="Canceled.", view=None)
 
 
 class LabelSelectView(discord.ui.View):
@@ -1247,6 +1372,29 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(goal_group)
 
+        shippo_group = discord.app_commands.Group(
+            name="shippo", description="Manage Shippo shipping integration"
+        )
+
+        @shippo_group.command(name="connect", description="Connect your Shippo account with an API key")
+        @discord.app_commands.describe(api_key="Your Shippo API key (starts with shippo_live_ or shippo_test_)")
+        async def shippo_connect(interaction: discord.Interaction, api_key: str):
+            await self._cmd_shippo_connect(interaction, api_key)
+
+        @shippo_group.command(name="address", description="Set your ship-from (return) address")
+        async def shippo_address(interaction: discord.Interaction):
+            await interaction.response.send_modal(ShippoAddressModal(self))
+
+        @shippo_group.command(name="status", description="Show Shippo connection and address")
+        async def shippo_status(interaction: discord.Interaction):
+            await self._cmd_shippo_status(interaction)
+
+        @shippo_group.command(name="disconnect", description="Remove your Shippo integration")
+        async def shippo_disconnect(interaction: discord.Interaction):
+            await self._cmd_shippo_disconnect(interaction)
+
+        tree.add_command(shippo_group)
+
         @tree.command(name="bestsellers", description="Show top listings by units or revenue (this month / year / all-time)")
         @discord.app_commands.describe(
             period="Time period (default: this month)",
@@ -1335,7 +1483,8 @@ class ShopkeepBot(discord.Client):
             ("/revenue [period]", "Show revenue summary (default: this month)"),
             ("/listings", "Browse your active Etsy listings"),
             ("/bestsellers [period] [ranked_by]", "Top listings by units or revenue (this month / year / all-time)"),
-            ("/label [receipt_ids] [preset]", "Buy shipping labels — omit receipt IDs to pick from a list"),
+            ("/shippo connect/address/status/disconnect", "Connect Shippo for label purchasing — set your API key and ship-from address"),
+            ("/label [receipt_ids] [preset]", "Buy shipping labels via Shippo — omit receipt IDs to pick from a list"),
             ("/preset add/list/remove", "Manage shipping presets — save carrier, mail class, weight, and dimensions for reuse with `/label`"),
             ("/reminders set/time/off/status", "Configure shipping deadline reminders"),
             ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
@@ -1626,6 +1775,58 @@ class ShopkeepBot(discord.Client):
         embed.add_field(name="Orders", value=str(order_count), inline=True)
         embed.add_field(name="Avg Order Value", value=f"${avg:,.2f} {currency}", inline=True)
         await interaction.followup.send(embed=embed)
+
+    # ── Shippo commands ───────────────────────────────────────────────────────
+
+    async def _cmd_shippo_connect(self, interaction: discord.Interaction, api_key: str) -> None:
+        await interaction.response.defer(ephemeral=True)
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, lambda: ShippoClient(api_key).validate())
+        except Exception as exc:
+            await interaction.followup.send(
+                f"Could not validate the Shippo API key: {exc}", ephemeral=True
+            )
+            return
+        async with db.get_db() as conn:
+            await db.save_shippo_key(conn, interaction.guild_id, api_key)
+            await conn.commit()
+        await interaction.followup.send(
+            "Shippo connected. Now run `/shippo address` to set your ship-from address.",
+            ephemeral=True,
+        )
+
+    async def _cmd_shippo_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            config = await db.get_shippo_config(conn, interaction.guild_id)
+        if not config or not config["api_key"]:
+            await interaction.response.send_message(
+                "Shippo is not connected. Run `/shippo connect` to set up.", ephemeral=True
+            )
+            return
+        lines = ["**Shippo connected**"]
+        if config["addr_name"] and config["addr_city"]:
+            parts = [config["addr_name"], config["addr_street1"] or ""]
+            if config["addr_street2"]:
+                parts.append(config["addr_street2"])
+            parts.append(f"{config['addr_city']}, {config['addr_state']} {config['addr_zip']}")
+            parts.append(config["addr_country"] or "US")
+            lines.append("Return address:\n" + "\n".join(p for p in parts if p))
+        else:
+            lines.append("No return address set — run `/shippo address` to configure it.")
+        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+
+    async def _cmd_shippo_disconnect(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            config = await db.get_shippo_config(conn, interaction.guild_id)
+            if not config:
+                await interaction.response.send_message(
+                    "Shippo isn't connected.", ephemeral=True
+                )
+                return
+            await db.delete_shippo_config(conn, interaction.guild_id)
+            await conn.commit()
+        await interaction.response.send_message("Shippo disconnected.", ephemeral=True)
 
     async def _cmd_preset_add(
         self,
@@ -2237,17 +2438,29 @@ class ShopkeepBot(discord.Client):
 
         async with db.get_db() as conn:
             guild_row = await db.get_guild(conn, interaction.guild_id)
+            shippo_config = await db.get_shippo_config(conn, interaction.guild_id)
             shop_row = await conn.execute("SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,))
             shop_row = await shop_row.fetchone()
         shop_name = shop_row["shop_name"] if shop_row else "My Shop"
+
+        if not shippo_config or not shippo_config["api_key"]:
+            await interaction.followup.send(
+                "Shippo isn't connected. Run `/shippo connect` with your Shippo API key to set up label purchasing.",
+                ephemeral=True,
+            )
+            return
+        if not (shippo_config["addr_name"] and shippo_config["addr_city"]):
+            await interaction.followup.send(
+                "No ship-from address set. Run `/shippo address` first.",
+                ephemeral=True,
+            )
+            return
 
         raw_ids = [part.strip() for part in receipt_ids_str.split(",") if part.strip()]
         receipt_ids: list[int] = []
         for raw in raw_ids:
             if not raw.isdigit():
-                await interaction.followup.send(
-                    f"`{raw}` is not a valid receipt ID.", ephemeral=True
-                )
+                await interaction.followup.send(f"`{raw}` is not a valid receipt ID.", ephemeral=True)
                 return
             receipt_ids.append(int(raw))
 
@@ -2255,15 +2468,15 @@ class ShopkeepBot(discord.Client):
             await interaction.followup.send("No receipt IDs provided.", ephemeral=True)
             return
 
-        # Validate eligibility before purchasing any labels
+        # Eligibility check
         receipt_rows: dict[int, any] = {}
         async with db.get_db() as conn:
             ineligible = []
             for rid in receipt_ids:
                 cursor = await conn.execute(
                     """
-                    SELECT receipt_id, is_paid, is_shipped,
-                           first_line, city, state, zip, country_iso
+                    SELECT receipt_id, is_paid, is_shipped, name,
+                           first_line, second_line, city, state, zip, country_iso
                     FROM receipts WHERE receipt_id = ? AND shop_id = ?
                     """,
                     (rid, shop_id),
@@ -2286,14 +2499,14 @@ class ShopkeepBot(discord.Client):
                 return
 
         # USPS address verification — warn but do not block
+        loop = asyncio.get_running_loop()
         address_warnings: list[str] = []
         if _usps_client:
-            loop = asyncio.get_running_loop()
             for rid, row in receipt_rows.items():
+                street = row["first_line"] or ""
                 city = row["city"] or ""
                 state = row["state"] or ""
                 zip_code = row["zip"] or ""
-                street = row["first_line"] or ""
                 if not (street and city and state and zip_code):
                     address_warnings.append(f"#{rid}: address incomplete, could not verify with USPS")
                     continue
@@ -2311,67 +2524,145 @@ class ShopkeepBot(discord.Client):
                     address_warnings.append(f"#{rid}: {exc}")
                 except Exception as exc:
                     print(f"[label] USPS verification failed for receipt {rid}: {exc}")
-                    # Don't warn on transient USPS API errors
 
         if address_warnings:
-            warning_text = (
+            await interaction.followup.send(
                 "**Address verification warning** — USPS could not confirm the following:\n" +
                 "\n".join(f"- {w}" for w in address_warnings) +
-                "\n\nYou can still proceed, but the label may be undeliverable."
+                "\n\nYou can still proceed, but the label may be undeliverable.",
+                ephemeral=True,
             )
-            await interaction.followup.send(warning_text, ephemeral=True)
 
-        loop = asyncio.get_running_loop()
+        shippo = ShippoClient(shippo_config["api_key"])
+        address_from: dict = {
+            "name": shippo_config["addr_name"],
+            "street1": shippo_config["addr_street1"] or "",
+            "city": shippo_config["addr_city"],
+            "state": shippo_config["addr_state"],
+            "zip": shippo_config["addr_zip"],
+            "country": shippo_config["addr_country"] or "US",
+        }
+        if shippo_config["addr_street2"]:
+            address_from["street2"] = shippo_config["addr_street2"]
+
+        # Get rates for each receipt
+        receipt_shipments: list[tuple[int, list]] = []
+        for rid, row in receipt_rows.items():
+            address_to: dict = {
+                "name": row["name"] or "Recipient",
+                "street1": row["first_line"] or "",
+                "city": row["city"] or "",
+                "state": row["state"] or "",
+                "zip": row["zip"] or "",
+                "country": row["country_iso"] or "US",
+            }
+            if row["second_line"]:
+                address_to["street2"] = row["second_line"]
+            try:
+                rates = await loop.run_in_executor(
+                    None,
+                    lambda a=address_to: shippo.get_rates(
+                        address_from, a, weight_oz, length_in, width_in, height_in
+                    ),
+                )
+                receipt_shipments.append((rid, rates))
+            except Exception as exc:
+                await interaction.followup.send(
+                    f"Could not get shipping rates for order #{rid}: {exc}", ephemeral=True
+                )
+                return
+
+        # Try to auto-match rate from preset carrier/mail_class
+        if carrier and mail_class:
+            rate_map: dict[int, dict] = {}
+            for rid, rates in receipt_shipments:
+                matched = ShippoClient.find_rate(rates, carrier, mail_class)
+                if matched:
+                    rate_map[rid] = matched
+                else:
+                    rate_map = {}
+                    break
+            if len(rate_map) == len(receipt_shipments):
+                await self._execute_label_purchases(
+                    interaction, rate_map, etsy, shop_id, guild_row, shop_name, shippo, loop
+                )
+                return
+
+        # No auto-match — show rate picker
+        if not receipt_shipments or not receipt_shipments[0][1]:
+            await interaction.followup.send(
+                "No shipping rates returned by Shippo. Check your address settings and try again.",
+                ephemeral=True,
+            )
+            return
+        view = RateSelectView(self, receipt_shipments, shop_id, shop_name, etsy, guild_row, shippo, loop)
+        await interaction.followup.send("Choose a shipping service:", view=view, ephemeral=True)
+
+    async def _execute_label_purchases(
+        self,
+        interaction: discord.Interaction,
+        rate_map: dict[int, dict],
+        etsy: EtsyClient,
+        shop_id: int,
+        guild_row,
+        shop_name: str,
+        shippo: ShippoClient,
+        loop,
+    ) -> None:
         results: list[dict] = []
         errors: list[str] = []
 
-        for rid in receipt_ids:
+        for receipt_id, rate in rate_map.items():
             try:
-                data = await loop.run_in_executor(
-                    None,
-                    lambda r=rid: etsy.create_shipping_label(
-                        shop_id, r, carrier, mail_class,
-                        weight_oz, length_in, width_in, height_in,
-                        package_type=package_type,
-                    ),
+                txn = await loop.run_in_executor(
+                    None, lambda r=rate: shippo.buy_rate(r["object_id"])
                 )
-                data["receipt_id"] = rid
-                results.append(data)
-            except Exception as exc:
-                err_str = str(exc)
-                body_text = getattr(getattr(exc, "response", None), "text", "")
-                print(f"[label] create_shipping_label error for receipt {rid}: {exc!r} body={body_text!r}")
-                # Try to extract Etsy's JSON error body for a friendlier message
-                etsy_msg = err_str
-                if hasattr(exc, "response") and exc.response is not None:
+                status = txn.get("status", "")
+                if status == "ERROR":
+                    msgs = txn.get("messages") or []
+                    msg = msgs[0].get("text", "unknown error") if msgs else "purchase failed"
+                    errors.append(f"#{receipt_id}: {msg}")
+                    continue
+
+                provider = rate.get("provider", "")
+                service_name = (rate.get("servicelevel") or {}).get("name", "")
+                result = {
+                    "receipt_id": receipt_id,
+                    "pdf_url": txn.get("label_url"),
+                    "tracking_number": txn.get("tracking_number", ""),
+                    "carrier_name": provider,
+                    "mail_class": service_name,
+                }
+                results.append(result)
+
+                # Post tracking to Etsy to mark order shipped
+                tracking_number = txn.get("tracking_number", "")
+                if tracking_number:
+                    etsy_carrier = ShippoClient.etsy_carrier_name(provider)
                     try:
-                        body = exc.response.json()
-                        etsy_msg = body.get("error_description") or body.get("message") or err_str
-                    except Exception:
-                        pass
-                is_scope_error = (
-                    "scope" in etsy_msg.lower()
-                    or "permission" in etsy_msg.lower()
-                    or "transactions_w" in etsy_msg.lower()
-                )
-                if is_scope_error:
-                    await interaction.followup.send(
-                        "Missing required scope. Run `/status` to re-authorize with label permissions.",
-                        ephemeral=True,
-                    )
-                    return
-                errors.append(f"#{rid}: {etsy_msg}")
+                        await loop.run_in_executor(
+                            None,
+                            lambda t=tracking_number, c=etsy_carrier: etsy.create_receipt_shipment(
+                                shop_id, receipt_id, c, t
+                            ),
+                        )
+                    except Exception as exc:
+                        print(f"[label] Etsy tracking post failed for #{receipt_id}: {exc}")
+            except Exception as exc:
+                print(f"[label] buy_rate error for #{receipt_id}: {exc!r}")
+                errors.append(f"#{receipt_id}: {exc}")
 
         if results:
             channel_id = guild_row["order_channel_id"] if guild_row else None
-            channel = self.get_channel(channel_id) if channel_id else interaction.channel
-            if channel:
-                await channel.send(embed=build_label_public_embed(results, shop_name))
+            if channel_id:
+                channel = self.get_channel(channel_id)
+                if channel:
+                    await channel.send(embed=build_label_public_embed(results, shop_name))
             try:
                 await interaction.user.send(embed=build_label_dm_embed(results, shop_name))
             except discord.Forbidden:
                 await interaction.followup.send(
-                    "Labels purchased, but your DMs are closed — check your Etsy account for PDF links.",
+                    "Labels purchased, but your DMs are closed — check Shippo for PDF links.",
                     ephemeral=True,
                 )
                 return

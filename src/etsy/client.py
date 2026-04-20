@@ -186,3 +186,21 @@ class EtsyClient:
             f"/application/shops/{shop_id}/receipts/{receipt_id}/shipping-labels",
             json=payload,
         )
+
+    def create_receipt_shipment(
+        self,
+        shop_id: int,
+        receipt_id: int,
+        carrier_name: str,
+        tracking_code: str,
+        send_bcc: bool = False,
+    ) -> Dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/application/shops/{shop_id}/receipts/{receipt_id}/tracking",
+            json={
+                "carrier_name": carrier_name,
+                "tracking_code": tracking_code,
+                "send_bcc": send_bcc,
+            },
+        )
