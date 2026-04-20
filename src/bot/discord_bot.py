@@ -198,7 +198,7 @@ class LabelSelectView(discord.ui.View):
 
     async def _on_select(self, interaction: discord.Interaction) -> None:
         self.selected_ids = self.select.values
-        await interaction.response.defer_update()
+        await interaction.response.edit_message()
 
     @discord.ui.button(label="Buy Labels", style=discord.ButtonStyle.primary)
     async def buy(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -376,7 +376,7 @@ class ImportSelectView(discord.ui.View):
         return " · ".join(parts) if parts else "Carrier not set"
 
     async def _on_select(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer_update()
+        await interaction.response.edit_message()
         if not self.select.values:
             return
         try:
@@ -388,7 +388,7 @@ class ImportSelectView(discord.ui.View):
         )
 
     async def _on_pkg_select(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer_update()
+        await interaction.response.edit_message()
         self.selected_package_type = self.pkg_select.values[0] if self.pkg_select.values else ""
 
     @discord.ui.button(label="Import", style=discord.ButtonStyle.primary, row=2)
@@ -1883,14 +1883,12 @@ class ShopkeepBot(discord.Client):
             pass  # non-fatal; modal fields remain editable
 
         view = ImportSelectView(self, interaction.guild_id, profiles, carrier_map)
-        msg = await interaction.followup.send(
+        await interaction.followup.send(
             f"Found **{len(profiles)}** shipping profile{'s' if len(profiles) != 1 else ''} on your Etsy shop.\n"
             "Select one to import as a preset, then fill in the package dimensions and weight.",
             view=view,
             ephemeral=True,
-            wait=True,
         )
-        self.add_view(view, message_id=msg.id)
 
     async def _cmd_reminders_set(self, interaction: discord.Interaction, days: str) -> None:
         if not interaction.user.guild_permissions.manage_guild:
