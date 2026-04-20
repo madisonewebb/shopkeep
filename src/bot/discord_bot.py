@@ -2645,6 +2645,11 @@ class ShopkeepBot(discord.Client):
                 }
                 results.append(result)
 
+                # Mark shipped locally immediately so it leaves the picker
+                async with db.get_db() as conn:
+                    await db.mark_receipt_shipped(conn, receipt_id)
+                    await conn.commit()
+
                 # Post tracking to Etsy to mark order shipped
                 tracking_number = txn.get("tracking_number", "")
                 if tracking_number:

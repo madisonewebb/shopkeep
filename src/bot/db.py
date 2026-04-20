@@ -1309,3 +1309,10 @@ async def save_shippo_address(
 
 async def delete_shippo_config(db: aiosqlite.Connection, guild_id: int) -> None:
     await db.execute("DELETE FROM shippo_keys WHERE guild_id = ?", (guild_id,))
+
+
+async def mark_receipt_shipped(db: aiosqlite.Connection, receipt_id: int) -> None:
+    await db.execute(
+        "UPDATE receipts SET is_shipped = 1 WHERE receipt_id = ?",
+        (receipt_id,),
+    )
