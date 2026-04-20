@@ -40,7 +40,7 @@ ETSY_AUTH_URL = "https://www.etsy.com/oauth/connect"
 ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
 ETSY_API_BASE = "https://openapi.etsy.com/v3"
 
-ETSY_SCOPES = "transactions_r listings_r shops_r profile_r"
+ETSY_SCOPES = "transactions_r transactions_rw listings_r shops_r profile_r"
 
 PKCE_STATE_TTL = 600  # 10 minutes
 
@@ -87,9 +87,6 @@ def connect(setup_token: str):
 
     if guild["setup_token_exp"] and guild["setup_token_exp"] < time.time():
         return render_template("error.html", message="This setup link has expired. Use !status in Discord to get a new one.")
-
-    if guild["etsy_shop_id"]:
-        return render_template("error.html", message="This server already has an Etsy shop connected.")
 
     if request.method == "POST":
         code_verifier, code_challenge = _make_pkce_pair()
