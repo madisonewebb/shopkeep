@@ -642,13 +642,15 @@ class ShopkeepBot(discord.Client):
             guild_rows = await db.get_connected_guilds(conn)
             for row in guild_rows:
                 guild_id = row["guild_id"]
-                if guild_id not in self.etsy_clients:
-                    tokens = await db.get_guild_tokens(conn, guild_id)
-                    if tokens:
-                        self._register_client(
-                            loop, guild_id,
-                            tokens["access_token"], tokens["refresh_token"], tokens["expires_at"],
-                        )
+                tokens = await db.get_guild_tokens(conn, guild_id)
+                if not tokens:
+                    continue
+                existing = self.etsy_clients.get(guild_id)
+                if existing is None or existing.access_token != tokens["access_token"]:
+                    self._register_client(
+                        loop, guild_id,
+                        tokens["access_token"], tokens["refresh_token"], tokens["expires_at"],
+                    )
 
         for row in guild_rows:
             guild_id = row["guild_id"]
