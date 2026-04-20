@@ -2339,7 +2339,8 @@ class ShopkeepBot(discord.Client):
                 results.append(data)
             except Exception as exc:
                 err_str = str(exc)
-                print(f"[label] create_shipping_label error for receipt {rid}: {exc!r}")
+                body_text = getattr(getattr(exc, "response", None), "text", "")
+                print(f"[label] create_shipping_label error for receipt {rid}: {exc!r} body={body_text!r}")
                 # Try to extract Etsy's JSON error body for a friendlier message
                 etsy_msg = err_str
                 if hasattr(exc, "response") and exc.response is not None:
