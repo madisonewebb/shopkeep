@@ -2339,13 +2339,27 @@ class ShopkeepBot(discord.Client):
                 results.append(data)
             except Exception as exc:
                 err_str = str(exc)
-                if "403" in err_str or "transactions_w" in err_str.lower():
+                print(f"[label] create_shipping_label error for receipt {rid}: {exc!r}")
+                # Try to extract Etsy's JSON error body for a friendlier message
+                etsy_msg = err_str
+                if hasattr(exc, "response") and exc.response is not None:
+                    try:
+                        body = exc.response.json()
+                        etsy_msg = body.get("error_description") or body.get("message") or err_str
+                    except Exception:
+                        pass
+                is_scope_error = (
+                    "scope" in etsy_msg.lower()
+                    or "permission" in etsy_msg.lower()
+                    or "transactions_w" in etsy_msg.lower()
+                )
+                if is_scope_error:
                     await interaction.followup.send(
                         "Missing required scope. Run `/status` to re-authorize with label permissions.",
                         ephemeral=True,
                     )
                     return
-                errors.append(f"#{rid}: {err_str}")
+                errors.append(f"#{rid}: {etsy_msg}")
 
         if results:
             channel_id = guild_row["order_channel_id"] if guild_row else None
