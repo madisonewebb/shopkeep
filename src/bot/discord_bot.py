@@ -2649,7 +2649,8 @@ class ShopkeepBot(discord.Client):
                     except Exception as exc:
                         print(f"[label] Etsy tracking post failed for #{receipt_id}: {exc}")
             except Exception as exc:
-                print(f"[label] buy_rate error for #{receipt_id}: {exc!r}")
+                body_text = getattr(getattr(exc, "response", None), "text", "")
+                print(f"[label] buy_rate error for #{receipt_id}: {exc!r} body={body_text!r}")
                 errors.append(f"#{receipt_id}: {exc}")
 
         if results:
