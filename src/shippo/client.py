@@ -59,7 +59,7 @@ class ShippoClient:
         """Purchase a rate. Returns transaction with label_url and tracking_number."""
         return self._request("POST", "/transactions", json={
             "rate": rate_object_id,
-            "label_file_type": "PDF",
+            "label_file_type": "PDF_4x6",
             "async": False,
         })
 
