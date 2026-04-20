@@ -256,14 +256,22 @@ class ShippoAddressModal(discord.ui.Modal, title="Ship-From Address"):
     addr_name = discord.ui.TextInput(label="Name or Company", max_length=100, placeholder="e.g. Madi's Crafts")
     street1 = discord.ui.TextInput(label="Street Address", max_length=100, placeholder="e.g. 123 Main St")
     city = discord.ui.TextInput(label="City", max_length=60, placeholder="e.g. San Francisco")
-    state = discord.ui.TextInput(label="State (2-letter code)", max_length=2, placeholder="e.g. CA")
-    zip_code = discord.ui.TextInput(label="ZIP Code", max_length=10, placeholder="e.g. 94117")
+    state_zip = discord.ui.TextInput(label="State + ZIP", max_length=15, placeholder="e.g. CA 94117")
+    phone = discord.ui.TextInput(label="Phone (required for USPS)", max_length=20, placeholder="e.g. 555-555-5555")
 
     def __init__(self, bot: "ShopkeepBot"):
         super().__init__()
         self.bot = bot
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        parts = self.state_zip.value.strip().replace(",", " ").split()
+        if len(parts) < 2:
+            await interaction.response.send_message(
+                "Enter state and ZIP separated by a space, e.g. `CA 94117`.", ephemeral=True
+            )
+            return
+        state = parts[0].upper()
+        zip_code = parts[1]
         async with db.get_db() as conn:
             await db.save_shippo_address(
                 conn,
@@ -272,9 +280,10 @@ class ShippoAddressModal(discord.ui.Modal, title="Ship-From Address"):
                 street1=self.street1.value.strip(),
                 street2="",
                 city=self.city.value.strip(),
-                state=self.state.value.strip().upper(),
-                zip_code=self.zip_code.value.strip(),
+                state=state,
+                zip_code=zip_code,
                 country="US",
+                phone=self.phone.value.strip(),
             )
             await conn.commit()
         await interaction.response.send_message("Return address saved.", ephemeral=True)
@@ -2541,6 +2550,7 @@ class ShopkeepBot(discord.Client):
             "state": shippo_config["addr_state"],
             "zip": shippo_config["addr_zip"],
             "country": shippo_config["addr_country"] or "US",
+            "phone": shippo_config["addr_phone"] or "",
         }
         if shippo_config["addr_street2"]:
             address_from["street2"] = shippo_config["addr_street2"]

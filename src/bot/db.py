@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS shippo_keys (
     addr_state   TEXT,
     addr_zip     TEXT,
     addr_country TEXT    NOT NULL DEFAULT 'US',
+    addr_phone   TEXT,
     created_at   INTEGER NOT NULL
 )
 """
@@ -226,6 +227,10 @@ async def init_db() -> None:
         await db.execute(_CREATE_TRANSACTIONS)
         await db.execute(_CREATE_REVIEWS)
         await db.execute(_CREATE_SHIPPO_KEYS)
+        try:
+            await db.execute("ALTER TABLE shippo_keys ADD COLUMN addr_phone TEXT")
+        except Exception:
+            pass  # column already exists
         try:
             await db.execute("ALTER TABLE listings ADD COLUMN image_url TEXT")
         except Exception:
@@ -1279,13 +1284,14 @@ async def save_shippo_address(
     state: str,
     zip_code: str,
     country: str,
+    phone: str = "",
 ) -> None:
     await db.execute(
         """
         INSERT INTO shippo_keys (guild_id, api_key, addr_name, addr_street1, addr_street2,
-                                 addr_city, addr_state, addr_zip, addr_country, created_at)
+                                 addr_city, addr_state, addr_zip, addr_country, addr_phone, created_at)
         VALUES (?, COALESCE((SELECT api_key FROM shippo_keys WHERE guild_id = ?), ''),
-                ?, ?, ?, ?, ?, ?, ?, ?)
+                ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(guild_id) DO UPDATE SET
             addr_name    = excluded.addr_name,
             addr_street1 = excluded.addr_street1,
@@ -1293,9 +1299,10 @@ async def save_shippo_address(
             addr_city    = excluded.addr_city,
             addr_state   = excluded.addr_state,
             addr_zip     = excluded.addr_zip,
-            addr_country = excluded.addr_country
+            addr_country = excluded.addr_country,
+            addr_phone   = excluded.addr_phone
         """,
-        (guild_id, guild_id, name, street1, street2, city, state, zip_code, country,
+        (guild_id, guild_id, name, street1, street2, city, state, zip_code, country, phone,
          int(time.time())),
     )
 
