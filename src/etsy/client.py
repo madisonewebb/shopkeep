@@ -67,7 +67,12 @@ class EtsyClient:
         self._ensure_fresh_token()
         url = f"{self.BASE_URL}{path}"
 
-        resp = self.session.request(method, url, headers=self._headers(), **kwargs)
+        try:
+            resp = self.session.request(method, url, headers=self._headers(), **kwargs)
+        except requests.exceptions.ConnectionError:
+            # Stale keep-alive connection; reset session and retry once
+            self.session = requests.Session()
+            resp = self.session.request(method, url, headers=self._headers(), **kwargs)
 
         if resp.status_code == 429:
             retry_after = int(resp.headers.get("Retry-After", 10))
