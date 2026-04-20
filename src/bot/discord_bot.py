@@ -591,6 +591,18 @@ def _parse_dims(dims_str: str) -> tuple[float, float, float] | None:
         return None
 
 
+def _check_guild_perm(interaction: discord.Interaction, perm: str) -> str | None:
+    """Return an error string if the invoker lacks `perm`, or None if they have it.
+    Uses interaction.guild_id (always present for guild interactions) and
+    interaction.permissions (populated from the interaction payload, not the member cache)."""
+    if interaction.guild_id is None:
+        return "This command can only be used inside a server."
+    if not getattr(interaction.permissions, perm):
+        perm_label = {"manage_guild": "Manage Server", "manage_channels": "Manage Channels"}.get(perm, perm)
+        return f"You need the **{perm_label}** permission to use this."
+    return None
+
+
 class ShopkeepBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
@@ -1505,10 +1517,8 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_setchannel(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_channels:
-            await interaction.response.send_message(
-                "You need the **Manage Channels** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_channels"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -1675,10 +1685,8 @@ class ShopkeepBot(discord.Client):
             view.message = msg
 
     async def _cmd_disconnect(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -1939,10 +1947,8 @@ class ShopkeepBot(discord.Client):
         await interaction.followup.send(f"Preset **{name}** removed.", ephemeral=True)
 
     async def _cmd_reminders_set(self, interaction: discord.Interaction, days: str) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         parsed = []
@@ -2022,10 +2028,8 @@ class ShopkeepBot(discord.Client):
     async def _cmd_reminders_time(
         self, interaction: discord.Interaction, time: str, timezone: str
     ) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         # Validate time format
@@ -2069,10 +2073,8 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_reminders_disable(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -2117,10 +2119,8 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_backlog_set(self, interaction: discord.Interaction, threshold: int) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
         if threshold < 1:
             await interaction.response.send_message(
@@ -2141,10 +2141,8 @@ class ShopkeepBot(discord.Client):
         )
 
     async def _cmd_backlog_off(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -2173,10 +2171,8 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_digest_on(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -2192,10 +2188,8 @@ class ShopkeepBot(discord.Client):
     async def _cmd_digest_time(
         self, interaction: discord.Interaction, time: str, timezone: str
     ) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         try:
@@ -2229,10 +2223,8 @@ class ShopkeepBot(discord.Client):
         )
 
     async def _cmd_digest_off(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
@@ -2269,10 +2261,8 @@ class ShopkeepBot(discord.Client):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_goal_set(self, interaction: discord.Interaction, amount: int) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
         if amount < 1:
             await interaction.response.send_message("Goal must be at least $1.", ephemeral=True)
@@ -2328,10 +2318,8 @@ class ShopkeepBot(discord.Client):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def _cmd_goal_off(self, interaction: discord.Interaction) -> None:
-        if not interaction.user.guild_permissions.manage_guild:
-            await interaction.response.send_message(
-                "You need the **Manage Server** permission to use this.", ephemeral=True
-            )
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
             return
 
         async with db.get_db() as conn:
