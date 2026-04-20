@@ -1878,11 +1878,12 @@ class ShopkeepBot(discord.Client):
             pass  # non-fatal; modal fields remain editable
 
         view = ImportSelectView(self, interaction.guild_id, profiles, carrier_map)
-        await interaction.followup.send(
-            f"Found **{len(profiles)}** shipping profile{'s' if len(profiles) != 1 else ''} on your Etsy shop.\n"
-            "Select one to import as a preset, then fill in the package dimensions and weight.",
+        await interaction.edit_original_response(
+            content=(
+                f"Found **{len(profiles)}** shipping profile{'s' if len(profiles) != 1 else ''} on your Etsy shop.\n"
+                "Select one to import as a preset, then fill in the package dimensions and weight."
+            ),
             view=view,
-            ephemeral=True,
         )
 
     async def _cmd_reminders_set(self, interaction: discord.Interaction, days: str) -> None:
