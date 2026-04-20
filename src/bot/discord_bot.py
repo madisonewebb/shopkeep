@@ -260,7 +260,7 @@ class LabelSelectView(discord.ui.View):
 
         options = [
             discord.SelectOption(
-                label=f"#{r['receipt_id']} — {r['name'] or 'Unknown buyer'}"[:100],
+                label=f"{r['name'] or 'Unknown buyer'} — {r['items'] or 'Unknown items'}"[:100],
                 value=str(r["receipt_id"]),
             )
             for r in receipts

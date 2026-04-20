@@ -936,10 +936,16 @@ async def get_labelable_receipts(db: aiosqlite.Connection, shop_id: int) -> list
     """Return paid, unshipped receipts for label autocomplete, newest first."""
     cursor = await db.execute(
         """
-        SELECT receipt_id, name, create_timestamp
-        FROM receipts
-        WHERE shop_id = ? AND is_paid = 1 AND is_shipped = 0
-        ORDER BY create_timestamp DESC
+        SELECT r.receipt_id, r.name, r.create_timestamp,
+               GROUP_CONCAT(
+                   CASE WHEN t.quantity > 1 THEN t.quantity || 'x ' || t.title ELSE t.title END,
+                   ', '
+               ) AS items
+        FROM receipts r
+        LEFT JOIN transactions t ON t.receipt_id = r.receipt_id AND t.shop_id = r.shop_id
+        WHERE r.shop_id = ? AND r.is_paid = 1 AND r.is_shipped = 0
+        GROUP BY r.receipt_id
+        ORDER BY r.create_timestamp DESC
         LIMIT 25
         """,
         (shop_id,),
