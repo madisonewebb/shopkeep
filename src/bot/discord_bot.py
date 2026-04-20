@@ -2337,7 +2337,7 @@ class ShopkeepBot(discord.Client):
                 results.append(data)
             except Exception as exc:
                 err_str = str(exc)
-                if "403" in err_str or "transactions_rw" in err_str.lower():
+                if "403" in err_str or "transactions_w" in err_str.lower():
                     await interaction.followup.send(
                         "Missing required scope. Run `/status` to re-authorize with label permissions.",
                         ephemeral=True,
