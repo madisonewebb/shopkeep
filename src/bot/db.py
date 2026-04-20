@@ -677,16 +677,23 @@ async def upsert_receipt(
     )
     is_new = cursor.rowcount == 1
 
-    # For existing rows, keep status fields current (notified_at is preserved by INSERT OR IGNORE)
+    # For existing rows, keep mutable fields current (notified_at is preserved by INSERT OR IGNORE)
     if not is_new:
         await db.execute(
             """
             UPDATE receipts
-            SET is_shipped = ?, status = ?, update_timestamp = ?,
-                expected_ship_date = ?, fetched_at = ?
+            SET name=?, first_line=?, second_line=?, city=?, state=?, zip=?, country_iso=?,
+                is_shipped=?, status=?, update_timestamp=?, expected_ship_date=?, fetched_at=?
             WHERE receipt_id = ?
             """,
             (
+                receipt.get("name"),
+                receipt.get("first_line"),
+                receipt.get("second_line"),
+                receipt.get("city"),
+                receipt.get("state"),
+                receipt.get("zip"),
+                receipt.get("country_iso"),
                 1 if receipt.get("is_shipped") else 0,
                 receipt.get("status", ""),
                 receipt.get("update_timestamp"),
