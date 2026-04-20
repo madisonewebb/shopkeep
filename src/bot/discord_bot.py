@@ -198,7 +198,7 @@ class LabelSelectView(discord.ui.View):
 
     async def _on_select(self, interaction: discord.Interaction) -> None:
         self.selected_ids = self.select.values
-        await interaction.response.edit_message()
+        await interaction.response.defer()
 
     @discord.ui.button(label="Buy Labels", style=discord.ButtonStyle.primary)
     async def buy(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -376,7 +376,7 @@ class ImportSelectView(discord.ui.View):
         return " · ".join(parts) if parts else "Carrier not set"
 
     async def _on_select(self, interaction: discord.Interaction) -> None:
-        await interaction.response.edit_message()
+        await interaction.response.defer()
         if not self.select.values:
             return
         try:
@@ -388,7 +388,7 @@ class ImportSelectView(discord.ui.View):
         )
 
     async def _on_pkg_select(self, interaction: discord.Interaction) -> None:
-        await interaction.response.edit_message()
+        await interaction.response.defer()
         self.selected_package_type = self.pkg_select.values[0] if self.pkg_select.values else ""
 
     @discord.ui.button(label="Import", style=discord.ButtonStyle.primary, row=2)
