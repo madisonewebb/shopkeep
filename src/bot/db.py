@@ -210,6 +210,22 @@ CREATE TABLE IF NOT EXISTS reviews (
 )
 """
 
+_CREATE_CONVERSATIONS = """
+CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id   INTEGER PRIMARY KEY,
+    shop_id           INTEGER NOT NULL REFERENCES shops(shop_id),
+    buyer_user_id     INTEGER,
+    buyer_name        TEXT,
+    last_message_id   INTEGER,
+    last_message_text TEXT,
+    create_timestamp  INTEGER NOT NULL,
+    last_update_ts    INTEGER,
+    fetched_at        INTEGER NOT NULL,
+    notified_at       INTEGER,
+    auto_replied_at   INTEGER
+)
+"""
+
 
 async def init_db() -> None:
     """Create all tables if they don't exist."""
@@ -226,6 +242,7 @@ async def init_db() -> None:
         await db.execute(_CREATE_SHIPPING_REMINDERS)
         await db.execute(_CREATE_TRANSACTIONS)
         await db.execute(_CREATE_REVIEWS)
+        await db.execute(_CREATE_CONVERSATIONS)
         await db.execute(_CREATE_SHIPPO_KEYS)
         try:
             await db.execute("ALTER TABLE shippo_keys ADD COLUMN addr_phone TEXT")
@@ -303,6 +320,22 @@ async def init_db() -> None:
             await db.execute(
                 "ALTER TABLE shipping_presets ADD COLUMN package_type TEXT NOT NULL DEFAULT ''"
             )
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN busyhours_start INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN busyhours_end INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN busyhours_message TEXT")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN busyhours_tz TEXT")
         except Exception:
             pass  # column already exists
         await db.commit()
@@ -1315,4 +1348,157 @@ async def mark_receipt_shipped(db: aiosqlite.Connection, receipt_id: int) -> Non
     await db.execute(
         "UPDATE receipts SET is_shipped = 1 WHERE receipt_id = ?",
         (receipt_id,),
+    )
+
+
+# ── Conversation helpers ──────────────────────────────────────────────────────
+
+
+async def upsert_conversation(
+    db: aiosqlite.Connection,
+    conv: dict,
+    already_seen: bool = False,
+) -> None:
+    """Insert or update a conversation row.
+
+    If `already_seen` is True, marks notified_at so the conversation won't
+    generate a Discord notification. For existing rows, resets notified_at to
+    NULL when the last_message_id changes (new inbound message detected).
+    """
+    buyer = conv.get("buyer") or {}
+    buyer_user_id = conv.get("buyer_user_id") or buyer.get("user_id")
+    buyer_name = conv.get("buyer_name") or buyer.get("login_name")
+    last_msg = conv.get("last_message") or {}
+    last_message_id = last_msg.get("message_id")
+    last_message_text = last_msg.get("text") or last_msg.get("message")
+    last_update_ts = conv.get("last_reply_timestamp") or conv.get("last_update_ts")
+    now = int(time.time())
+
+    cursor = await db.execute(
+        "SELECT last_message_id, notified_at FROM conversations WHERE conversation_id = ?",
+        (conv["conversation_id"],),
+    )
+    existing = await cursor.fetchone()
+
+    if existing is None:
+        notified_at = now if already_seen else None
+        await db.execute(
+            """
+            INSERT INTO conversations (
+                conversation_id, shop_id, buyer_user_id, buyer_name,
+                last_message_id, last_message_text, create_timestamp,
+                last_update_ts, fetched_at, notified_at, auto_replied_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (
+                conv["conversation_id"],
+                conv["shop_id"],
+                buyer_user_id,
+                buyer_name,
+                last_message_id,
+                last_message_text,
+                conv.get("create_timestamp", now),
+                last_update_ts,
+                now,
+                notified_at,
+            ),
+        )
+    else:
+        message_changed = existing["last_message_id"] != last_message_id
+        if already_seen:
+            new_notified_at = existing["notified_at"] if existing["notified_at"] is not None else now
+        else:
+            new_notified_at = None if message_changed else existing["notified_at"]
+        await db.execute(
+            """
+            UPDATE conversations
+            SET buyer_name=?, last_message_id=?, last_message_text=?,
+                last_update_ts=?, fetched_at=?, notified_at=?
+            WHERE conversation_id=?
+            """,
+            (buyer_name, last_message_id, last_message_text, last_update_ts, now,
+             new_notified_at, conv["conversation_id"]),
+        )
+
+
+async def get_unnotified_conversations(db: aiosqlite.Connection, shop_id: int) -> list:
+    cursor = await db.execute(
+        """
+        SELECT * FROM conversations
+        WHERE shop_id = ? AND notified_at IS NULL
+        ORDER BY create_timestamp ASC
+        """,
+        (shop_id,),
+    )
+    return await cursor.fetchall()
+
+
+async def mark_conversation_notified(db: aiosqlite.Connection, conversation_id: int) -> None:
+    await db.execute(
+        "UPDATE conversations SET notified_at = ? WHERE conversation_id = ?",
+        (int(time.time()), conversation_id),
+    )
+
+
+async def mark_conversation_auto_replied(db: aiosqlite.Connection, conversation_id: int) -> None:
+    await db.execute(
+        "UPDATE conversations SET auto_replied_at = ? WHERE conversation_id = ?",
+        (int(time.time()), conversation_id),
+    )
+
+
+# ── Busy hours helpers ────────────────────────────────────────────────────────
+
+
+async def get_busyhours_config(
+    db: aiosqlite.Connection, guild_id: int
+) -> dict | None:
+    """Return busy hours config for a guild, or None if not configured."""
+    cursor = await db.execute(
+        "SELECT busyhours_start, busyhours_end, busyhours_message, busyhours_tz FROM guilds WHERE guild_id = ?",
+        (guild_id,),
+    )
+    row = await cursor.fetchone()
+    if row is None or row["busyhours_start"] is None:
+        return None
+    return {
+        "start": row["busyhours_start"],
+        "end": row["busyhours_end"],
+        "message": row["busyhours_message"],
+        "tz": row["busyhours_tz"] or "UTC",
+    }
+
+
+async def set_busyhours(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    start_hour: int,
+    end_hour: int,
+    tz: str = "UTC",
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET busyhours_start=?, busyhours_end=?, busyhours_tz=? WHERE guild_id=?",
+        (start_hour, end_hour, tz, guild_id),
+    )
+
+
+async def set_busyhours_message(
+    db: aiosqlite.Connection,
+    guild_id: int,
+    message: str,
+) -> None:
+    await db.execute(
+        "UPDATE guilds SET busyhours_message=? WHERE guild_id=?",
+        (message, guild_id),
+    )
+
+
+async def clear_busyhours(db: aiosqlite.Connection, guild_id: int) -> None:
+    await db.execute(
+        """
+        UPDATE guilds
+        SET busyhours_start=NULL, busyhours_end=NULL, busyhours_message=NULL, busyhours_tz=NULL
+        WHERE guild_id=?
+        """,
+        (guild_id,),
     )

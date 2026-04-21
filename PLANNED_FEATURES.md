@@ -81,6 +81,6 @@ Done:
 - /help, /status, /setchannel, /shop, /orders, /disconnect, /revenue, /listings, /preset, /label
 
 Stretch:
-S1. Etsy Conversations + busy hours (/busyhours)
+S1. Etsy Conversations + busy hours (/busyhours) ✓ DONE
 
 

@@ -200,6 +200,16 @@
           <code class="text-sk-lblue text-sm font-medium block mb-2">/goal set · /goal status · /goal off</code>
           <p class="text-sm text-sk-muted leading-relaxed">Set a monthly revenue target. The bot notifies you at 25%, 50%, 75%, and 100% milestones, and shows progress in the daily digest. Resets automatically each month.</p>
         </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/busyhours set · /busyhours message · /busyhours off · /busyhours status</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Configure an automatic away message for buyers who contact you during off-hours. Set your window with <code class="text-sk-lblue">/busyhours set &lt;start&gt; &lt;end&gt;</code> (24-hour hours, e.g. <code class="text-sk-lblue">/busyhours set 22 8</code> for 10 PM–8 AM) and your message with <code class="text-sk-lblue">/busyhours message</code>. The auto-reply fires at most once per conversation per busy window — it never spams a buyer who sends multiple messages.</p>
+        </div>
+
+        <div class="cmd-card">
+          <code class="text-sk-lblue text-sm font-medium block mb-2">/reply &lt;conversation_id&gt; &lt;message&gt;</code>
+          <p class="text-sm text-sk-muted leading-relaxed">Send a reply to a buyer conversation on Etsy directly from Discord. The conversation ID is shown in new message notifications posted to your channel.</p>
+        </div>
       </div>
     </div>
   </main>

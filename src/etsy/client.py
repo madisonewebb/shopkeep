@@ -204,3 +204,24 @@ class EtsyClient:
                 "send_bcc": send_bcc,
             },
         )
+
+    def get_conversations(
+        self,
+        shop_id: int,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        return self._request("GET", f"/application/shops/{shop_id}/conversations", params=params)
+
+    def send_conversation_reply(
+        self,
+        shop_id: int,
+        conversation_id: int,
+        message: str,
+    ) -> Dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/application/shops/{shop_id}/conversations/{conversation_id}/messages",
+            json={"message": message},
+        )
