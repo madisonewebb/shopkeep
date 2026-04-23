@@ -10,7 +10,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_auto_reply_sent_embed, build_backlog_embed, build_bestsellers_embed, build_busy_hours_followup_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_message_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 from src.shippo.client import ShippoClient
 from src.usps.client import USPSAddressVerificationError, USPSClient
@@ -44,39 +44,6 @@ _PACKAGE_TYPES: list[tuple[str, str]] = [
     ("REGIONAL_RATE_BOX_B", "Regional Rate Box B"),
 ]
 
-
-def _is_in_busy_hours(start_h: int, end_h: int, tz_str: str) -> bool:
-    """Return True if the current local hour falls within [start_h, end_h)."""
-    try:
-        tz = zoneinfo.ZoneInfo(tz_str)
-    except zoneinfo.ZoneInfoNotFoundError:
-        tz = datetime.timezone.utc
-    h = datetime.datetime.now(tz).hour
-    if start_h < end_h:
-        return start_h <= h < end_h
-    # Overnight window, e.g. 22:00–08:00
-    return h >= start_h or h < end_h
-
-
-def _busy_window_start(start_h: int, end_h: int, tz_str: str) -> int:
-    """Return the Unix timestamp when the current busy window began."""
-    try:
-        tz = zoneinfo.ZoneInfo(tz_str)
-    except zoneinfo.ZoneInfoNotFoundError:
-        tz = datetime.timezone.utc
-    now = datetime.datetime.now(tz)
-    h = now.hour
-    if start_h <= end_h:
-        window_dt = now.replace(hour=start_h, minute=0, second=0, microsecond=0)
-    else:
-        if h >= start_h:
-            window_dt = now.replace(hour=start_h, minute=0, second=0, microsecond=0)
-        else:
-            yesterday = now.date() - datetime.timedelta(days=1)
-            window_dt = datetime.datetime(
-                yesterday.year, yesterday.month, yesterday.day, start_h, 0, 0, tzinfo=tz
-            )
-    return int(window_dt.timestamp())
 
 
 class OrdersView(discord.ui.View):
@@ -649,7 +616,6 @@ class ShopkeepBot(discord.Client):
         self._bootstrapped = False
         self._last_polled: dict[int, int] = {}
         self._poll_tick: int = 0
-        self._guild_busy_state: dict[int, bool] = {}
 
     async def setup_hook(self):
         db.DB_PATH = DB_PATH_ENV
@@ -805,26 +771,13 @@ class ShopkeepBot(discord.Client):
                 review["shop_id"] = shop_id
                 await db.upsert_review(conn, review, already_seen=True)
 
-            try:
-                convs_resp = await loop.run_in_executor(
-                    None, lambda: etsy.get_conversations(shop_id, limit=50)
-                )
-                convs = convs_resp.get("results", [])
-                for conv in convs:
-                    conv["shop_id"] = shop_id
-                    await db.upsert_conversation(conn, conv, already_seen=True)
-            except Exception as exc:
-                convs = []
-                print(f"[bootstrap] conversations fetch failed: {exc}")
-
             await conn.commit()
 
         shop_name = shop_data.get("shop_name", "")
         print(
             f"[bootstrap] Done — '{shop_name}', "
             f"{len(listings)} listing(s), {len(receipts)} existing receipt(s) marked seen, "
-            f"{len(reviews)} existing review(s) marked seen, "
-            f"{len(convs)} existing conversation(s) marked seen."
+            f"{len(reviews)} existing review(s) marked seen."
         )
         return shop_name
 
@@ -997,7 +950,6 @@ class ShopkeepBot(discord.Client):
             await self._check_digest(conn, guild_id, shop_id, channel, shop_name)
             await self._check_shipping_reminders(conn, guild_id, shop_id, channel, shop_name)
             await self._check_new_reviews(conn, guild_id, shop_id, channel, shop_name)
-            await self._check_new_messages(conn, guild_id, shop_id, channel, shop_name)
 
         self._last_polled[guild_id] = int(time.time())
 
@@ -1250,95 +1202,6 @@ class ShopkeepBot(discord.Client):
             await channel.send(embed=embed)
             await db.mark_review_notified(conn, row["transaction_id"])
             await conn.commit()
-
-    async def _check_new_messages(
-        self,
-        conn,
-        guild_id: int,
-        shop_id: int,
-        channel,
-        shop_name: str,
-    ) -> None:
-        """Fetch recent conversations, store new ones, and post notifications.
-
-        Runs every 5th poll cycle (~5 minutes). During configured busy hours,
-        sends a customizable auto-reply once per conversation per busy window.
-        """
-        etsy = self.etsy_clients.get(guild_id)
-        if not etsy or channel is None:
-            return
-        loop = asyncio.get_running_loop()
-
-        if self._poll_tick % 5 == 0:
-            try:
-                response = await loop.run_in_executor(
-                    None, lambda: etsy.get_conversations(shop_id, limit=25)
-                )
-                convs = response.get("results", [])
-                for conv in convs:
-                    conv["shop_id"] = shop_id
-                    await db.upsert_conversation(conn, conv)
-                await conn.commit()
-            except Exception:
-                # Etsy v3 does not expose a public conversations API; silently skip.
-                return
-
-        unnotified = await db.get_unnotified_conversations(conn, shop_id)
-        busy_config = await db.get_busyhours_config(conn, guild_id)
-
-        currently_busy = False
-        if busy_config and busy_config.get("message"):
-            tz_str = busy_config.get("tz", "UTC")
-            start_h = busy_config["start"]
-            end_h = busy_config["end"]
-            currently_busy = _is_in_busy_hours(start_h, end_h, tz_str)
-
-        for row in unnotified:
-            conv_dict = dict(row)
-            await channel.send(embed=build_message_embed(conv_dict, shop_name))
-            await db.mark_conversation_notified(conn, row["conversation_id"])
-
-            if currently_busy:
-                window_start_ts = _busy_window_start(start_h, end_h, tz_str)
-                auto_replied_at = row["auto_replied_at"]
-                already_replied = (
-                    auto_replied_at is not None and auto_replied_at >= window_start_ts
-                )
-                if not already_replied:
-                    conv_id = row["conversation_id"]
-                    reply_text = busy_config["message"]
-                    try:
-                        await loop.run_in_executor(
-                            None,
-                            lambda cid=conv_id, msg=reply_text: etsy.send_conversation_reply(
-                                shop_id, cid, msg
-                            ),
-                        )
-                        await db.mark_conversation_auto_replied(conn, conv_id)
-                        buyer_name = row["buyer_name"] or "Unknown"
-                        await channel.send(
-                            embed=build_auto_reply_sent_embed(
-                                buyer_name, conv_id, reply_text, shop_name
-                            )
-                        )
-                    except Exception as exc:
-                        print(f"[poller] auto-reply failed conv={conv_id}: {exc}")
-
-            await conn.commit()
-
-        # Detect busy → idle transition and post a follow-up reminder
-        was_busy = self._guild_busy_state.get(guild_id)
-        if was_busy is None:
-            # First run — seed state without triggering a reminder
-            self._guild_busy_state[guild_id] = currently_busy
-        elif was_busy and not currently_busy:
-            self._guild_busy_state[guild_id] = False
-            window_start_ts = _busy_window_start(start_h, end_h, tz_str)
-            pending = await db.get_auto_replied_conversations_since(conn, shop_id, window_start_ts)
-            if pending and channel:
-                await channel.send(embed=build_busy_hours_followup_embed(list(pending), shop_name))
-        else:
-            self._guild_busy_state[guild_id] = currently_busy
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
@@ -1611,81 +1474,6 @@ class ShopkeepBot(discord.Client):
         ):
             await self._cmd_label(interaction, receipt_ids=receipt_ids, preset=preset)
 
-        busyhours_group = discord.app_commands.Group(
-            name="busyhours",
-            description="Configure auto-replies sent to buyers who message during off-hours",
-        )
-
-        @busyhours_group.command(
-            name="set",
-            description="Set the hours when the auto-reply is active",
-        )
-        @discord.app_commands.describe(
-            start="Hour to begin busy window (0–23, 24-hour clock, e.g. 22 for 10 PM)",
-            end="Hour to end busy window (0–23, 24-hour clock, e.g. 8 for 8 AM)",
-            timezone="Timezone name (e.g. America/New_York). Use autocomplete to find yours.",
-        )
-        @discord.app_commands.autocomplete(timezone=self._autocomplete_timezone)
-        async def busyhours_set(
-            interaction: discord.Interaction,
-            start: int,
-            end: int,
-            timezone: str = "UTC",
-        ):
-            await self._cmd_busyhours_set(interaction, start=start, end=end, timezone=timezone)
-
-        @busyhours_group.command(
-            name="message",
-            description="Set the away message sent to buyers during busy hours",
-        )
-        @discord.app_commands.describe(message="Message to auto-send to buyers who write in during busy hours")
-        async def busyhours_message_cmd(interaction: discord.Interaction, message: str):
-            await self._cmd_busyhours_message(interaction, message=message)
-
-        @busyhours_group.command(name="off", description="Disable the busy hours auto-reply")
-        async def busyhours_off(interaction: discord.Interaction):
-            await self._cmd_busyhours_off(interaction)
-
-        @busyhours_group.command(
-            name="status",
-            description="Show the current busy hours configuration",
-        )
-        async def busyhours_status(interaction: discord.Interaction):
-            await self._cmd_busyhours_status(interaction)
-
-        tree.add_command(busyhours_group)
-
-        @tree.command(name="reply", description="Send a reply to a buyer conversation on Etsy")
-        @discord.app_commands.describe(
-            buyer="Start typing a buyer name to search, or enter a conversation ID",
-            message="Your reply to the buyer",
-        )
-        @discord.app_commands.autocomplete(buyer=self._autocomplete_conversation)
-        async def reply_cmd(interaction: discord.Interaction, buyer: str, message: str):
-            await self._cmd_reply(interaction, conversation_id=buyer, message=message)
-
-    async def _autocomplete_conversation(
-        self, interaction: discord.Interaction, current: str
-    ) -> list[discord.app_commands.Choice[str]]:
-        async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, interaction.guild_id)
-            if not guild_row or not guild_row["etsy_shop_id"]:
-                return []
-            rows = await db.get_recent_conversations(conn, guild_row["etsy_shop_id"])
-
-        current_lower = current.lower()
-        choices = []
-        for row in rows:
-            buyer = row["buyer_name"] or "Unknown buyer"
-            preview = (row["last_message_text"] or "").replace("\n", " ")[:40]
-            label = f"{buyer} — {preview}" if preview else buyer
-            if current_lower and current_lower not in buyer.lower() and current_lower not in preview.lower():
-                continue
-            choices.append(
-                discord.app_commands.Choice(name=label[:100], value=str(row["conversation_id"]))
-            )
-        return choices[:25]
-
     async def _autocomplete_labelable_receipt(
         self, interaction: discord.Interaction, current: str
     ) -> list[discord.app_commands.Choice[str]]:
@@ -1742,8 +1530,6 @@ class ShopkeepBot(discord.Client):
             ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
             ("/digest on/time/off/status", "Configure the daily order digest"),
             ("/goal set/status/off", "Set and track a monthly revenue goal"),
-            ("/busyhours set/message/off/status", "Configure an auto-reply for buyers who message during busy hours"),
-            ("/reply <buyer> <message>", "Send a reply to a buyer conversation on Etsy — pick from autocomplete or type an ID"),
         ]
         for name, desc in sections:
             embed.add_field(name=name, value=desc, inline=False)
@@ -2912,154 +2698,6 @@ class ShopkeepBot(discord.Client):
                 "All label purchases failed:\n" + "\n".join(f"- {e}" for e in errors),
                 ephemeral=True,
             )
-
-    async def _cmd_busyhours_set(
-        self,
-        interaction: discord.Interaction,
-        start: int,
-        end: int,
-        timezone: str,
-    ) -> None:
-        if err := _check_guild_perm(interaction, "manage_guild"):
-            await interaction.response.send_message(err, ephemeral=True)
-            return
-        if not (0 <= start <= 23 and 0 <= end <= 23):
-            await interaction.response.send_message(
-                "Hours must be between 0 and 23.", ephemeral=True
-            )
-            return
-        if start == end:
-            await interaction.response.send_message(
-                "Start and end hours cannot be the same.", ephemeral=True
-            )
-            return
-        try:
-            zoneinfo.ZoneInfo(timezone)
-        except zoneinfo.ZoneInfoNotFoundError:
-            await interaction.response.send_message(
-                f"Unknown timezone `{timezone}`. Use autocomplete to find a valid one.",
-                ephemeral=True,
-            )
-            return
-
-        async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, interaction.guild_id)
-            if not guild_row or not guild_row["etsy_shop_id"]:
-                await interaction.response.send_message("No Etsy shop connected.", ephemeral=True)
-                return
-            await db.set_busyhours(conn, interaction.guild_id, start, end, timezone)
-            await conn.commit()
-
-        window = f"{start:02d}:00 – {end:02d}:00 ({timezone})"
-        embed = discord.Embed(
-            title="Busy Hours Configured",
-            description=(
-                f"Auto-replies will fire from **{window}**.\n\n"
-                "Set your away message with `/busyhours message`."
-            ),
-            color=discord.Color.green(),
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    async def _cmd_busyhours_message(
-        self, interaction: discord.Interaction, message: str
-    ) -> None:
-        if err := _check_guild_perm(interaction, "manage_guild"):
-            await interaction.response.send_message(err, ephemeral=True)
-            return
-        if len(message) > 2000:
-            await interaction.response.send_message(
-                "Message must be 2000 characters or fewer.", ephemeral=True
-            )
-            return
-
-        async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, interaction.guild_id)
-            if not guild_row or not guild_row["etsy_shop_id"]:
-                await interaction.response.send_message("No Etsy shop connected.", ephemeral=True)
-                return
-            await db.set_busyhours_message(conn, interaction.guild_id, message)
-            await conn.commit()
-
-        embed = discord.Embed(
-            title="Auto-reply Message Saved",
-            description=f'"{message}"',
-            color=discord.Color.green(),
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    async def _cmd_busyhours_off(self, interaction: discord.Interaction) -> None:
-        if err := _check_guild_perm(interaction, "manage_guild"):
-            await interaction.response.send_message(err, ephemeral=True)
-            return
-
-        async with db.get_db() as conn:
-            await db.clear_busyhours(conn, interaction.guild_id)
-            await conn.commit()
-
-        await interaction.response.send_message(
-            "Busy hours auto-reply has been disabled.", ephemeral=True
-        )
-
-    async def _cmd_busyhours_status(self, interaction: discord.Interaction) -> None:
-        async with db.get_db() as conn:
-            config = await db.get_busyhours_config(conn, interaction.guild_id)
-
-        if not config:
-            await interaction.response.send_message(
-                "Busy hours are not configured. Use `/busyhours set` to enable.",
-                ephemeral=True,
-            )
-            return
-
-        start = config["start"]
-        end = config["end"]
-        tz_str = config.get("tz", "UTC")
-        window = f"{start:02d}:00 – {end:02d}:00 ({tz_str})"
-        msg_preview = config.get("message") or "*(not set — use `/busyhours message`)*"
-
-        embed = discord.Embed(title="Busy Hours Status", color=discord.Color.blurple())
-        embed.add_field(name="Window", value=window, inline=False)
-        embed.add_field(name="Away Message", value=f'"{msg_preview}"', inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    async def _cmd_reply(
-        self,
-        interaction: discord.Interaction,
-        conversation_id: str,
-        message: str,
-    ) -> None:
-        await interaction.response.defer(ephemeral=True)
-
-        try:
-            conv_id = int(conversation_id.strip())
-        except ValueError:
-            await interaction.followup.send(
-                "Please select a conversation from the dropdown or enter a numeric conversation ID.",
-                ephemeral=True,
-            )
-            return
-
-        etsy, shop_id = await self._get_etsy_client(interaction)
-        if not etsy:
-            return
-
-        loop = asyncio.get_running_loop()
-        try:
-            await loop.run_in_executor(
-                None,
-                lambda: etsy.send_conversation_reply(shop_id, conv_id, message),
-            )
-        except Exception as exc:
-            await interaction.followup.send(f"Failed to send reply: {exc}", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="Reply Sent",
-            description=f"Conversation #{conv_id}\n\"{message}\"",
-            color=discord.Color.green(),
-        )
-        await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def _get_etsy_client_silent(
         self, interaction: discord.Interaction

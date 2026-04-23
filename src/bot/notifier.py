@@ -576,67 +576,6 @@ def build_label_public_embed(
     return embed
 
 
-def build_message_embed(conversation: dict, shop_name: str) -> discord.Embed:
-    """Build a Discord embed for a new inbound buyer message notification."""
-    conv_id = conversation.get("conversation_id", "?")
-    buyer = conversation.get("buyer_name") or "Unknown"
-    text = (conversation.get("last_message_text") or "").strip()
-    snippet = text[:300] + ("..." if len(text) > 300 else "")
-
-    embed = discord.Embed(
-        title="New Message from Buyer",
-        url="https://www.etsy.com/messages",
-        description=f'**{buyer}:** "{snippet}"' if snippet else f"**{buyer}** sent a message.",
-        color=discord.Color.blue(),
-    )
-    embed.add_field(name="Conversation", value=f"#{conv_id}", inline=True)
-    embed.add_field(name="Reply", value=f"`/reply {conv_id} <message>`", inline=True)
-
-    ts = conversation.get("last_update_ts") or conversation.get("create_timestamp")
-    if ts:
-        embed.timestamp = datetime.fromtimestamp(ts, tz=timezone.utc)
-
-    embed.set_footer(text=shop_name)
-    return embed
-
-
-def build_auto_reply_sent_embed(
-    buyer_name: str,
-    conversation_id: int,
-    message: str,
-    shop_name: str,
-) -> discord.Embed:
-    """Build a Discord embed confirming an auto-reply was sent during busy hours."""
-    embed = discord.Embed(
-        title="Auto-reply Sent",
-        description=f"To: **{buyer_name}** (Conversation #{conversation_id})\n\"{message}\"",
-        color=discord.Color.dark_grey(),
-    )
-    embed.set_footer(text=shop_name)
-    return embed
-
-
-def build_busy_hours_followup_embed(conversations: list, shop_name: str) -> discord.Embed:
-    """Reminder posted when busy hours end listing buyers who received an auto-reply."""
-    count = len(conversations)
-    embed = discord.Embed(
-        title=f"Busy Hours Over — {count} Buyer{'s' if count != 1 else ''} Waiting",
-        description="These buyers messaged during busy hours and got an auto-reply. Use `/reply` to follow up!",
-        color=discord.Color.gold(),
-        timestamp=datetime.now(timezone.utc),
-    )
-    for conv in conversations:
-        buyer = conv["buyer_name"] or "Unknown buyer"
-        preview = (conv["last_message_text"] or "").replace("\n", " ")[:80]
-        embed.add_field(
-            name=buyer,
-            value=f'"{preview}"' if preview else "*(no preview)*",
-            inline=False,
-        )
-    embed.set_footer(text=shop_name)
-    return embed
-
-
 def build_label_dm_embed(
     results: list[dict],
     shop_name: str,
