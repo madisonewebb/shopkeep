@@ -1622,11 +1622,34 @@ class ShopkeepBot(discord.Client):
 
         @tree.command(name="reply", description="Send a reply to a buyer conversation on Etsy")
         @discord.app_commands.describe(
-            conversation_id="Conversation ID (shown in message notifications)",
+            conversation_id="Buyer name or conversation ID",
             message="Your reply to the buyer",
         )
-        async def reply_cmd(interaction: discord.Interaction, conversation_id: int, message: str):
+        @discord.app_commands.autocomplete(conversation_id=self._autocomplete_conversation)
+        async def reply_cmd(interaction: discord.Interaction, conversation_id: str, message: str):
             await self._cmd_reply(interaction, conversation_id=conversation_id, message=message)
+
+    async def _autocomplete_conversation(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[discord.app_commands.Choice[str]]:
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                return []
+            rows = await db.get_recent_conversations(conn, guild_row["etsy_shop_id"])
+
+        current_lower = current.lower()
+        choices = []
+        for row in rows:
+            buyer = row["buyer_name"] or "Unknown buyer"
+            preview = (row["last_message_text"] or "").replace("\n", " ")[:40]
+            label = f"{buyer} — {preview}" if preview else buyer
+            if current_lower and current_lower not in buyer.lower() and current_lower not in preview.lower():
+                continue
+            choices.append(
+                discord.app_commands.Choice(name=label[:100], value=str(row["conversation_id"]))
+            )
+        return choices[:25]
 
     async def _autocomplete_labelable_receipt(
         self, interaction: discord.Interaction, current: str
@@ -1685,7 +1708,7 @@ class ShopkeepBot(discord.Client):
             ("/digest on/time/off/status", "Configure the daily order digest"),
             ("/goal set/status/off", "Set and track a monthly revenue goal"),
             ("/busyhours set/message/off/status", "Configure an auto-reply for buyers who message during busy hours"),
-            ("/reply <conversation_id> <message>", "Send a reply to a buyer conversation on Etsy"),
+            ("/reply <buyer> <message>", "Send a reply to a buyer conversation on Etsy — pick from autocomplete or type an ID"),
         ]
         for name, desc in sections:
             embed.add_field(name=name, value=desc, inline=False)
@@ -2968,10 +2991,19 @@ class ShopkeepBot(discord.Client):
     async def _cmd_reply(
         self,
         interaction: discord.Interaction,
-        conversation_id: int,
+        conversation_id: str,
         message: str,
     ) -> None:
         await interaction.response.defer(ephemeral=True)
+
+        try:
+            conv_id = int(conversation_id.strip())
+        except ValueError:
+            await interaction.followup.send(
+                "Please select a conversation from the dropdown or enter a numeric conversation ID.",
+                ephemeral=True,
+            )
+            return
 
         etsy, shop_id = await self._get_etsy_client(interaction)
         if not etsy:
@@ -2981,7 +3013,7 @@ class ShopkeepBot(discord.Client):
         try:
             await loop.run_in_executor(
                 None,
-                lambda: etsy.send_conversation_reply(shop_id, conversation_id, message),
+                lambda: etsy.send_conversation_reply(shop_id, conv_id, message),
             )
         except Exception as exc:
             await interaction.followup.send(f"Failed to send reply: {exc}", ephemeral=True)
@@ -2989,7 +3021,7 @@ class ShopkeepBot(discord.Client):
 
         embed = discord.Embed(
             title="Reply Sent",
-            description=f"Conversation #{conversation_id}\n\"{message}\"",
+            description=f"Conversation #{conv_id}\n\"{message}\"",
             color=discord.Color.green(),
         )
         await interaction.followup.send(embed=embed, ephemeral=True)

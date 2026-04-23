@@ -1433,6 +1433,20 @@ async def get_unnotified_conversations(db: aiosqlite.Connection, shop_id: int) -
     return await cursor.fetchall()
 
 
+async def get_recent_conversations(db: aiosqlite.Connection, shop_id: int, limit: int = 50) -> list:
+    cursor = await db.execute(
+        """
+        SELECT conversation_id, buyer_name, last_message_text
+        FROM conversations
+        WHERE shop_id = ?
+        ORDER BY last_update_ts DESC NULLS LAST
+        LIMIT ?
+        """,
+        (shop_id, limit),
+    )
+    return await cursor.fetchall()
+
+
 async def mark_conversation_notified(db: aiosqlite.Connection, conversation_id: int) -> None:
     await db.execute(
         "UPDATE conversations SET notified_at = ? WHERE conversation_id = ?",
