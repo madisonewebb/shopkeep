@@ -10,7 +10,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_auto_reply_sent_embed, build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_message_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_auto_reply_sent_embed, build_backlog_embed, build_bestsellers_embed, build_busy_hours_followup_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_message_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 from src.shippo.client import ShippoClient
 from src.usps.client import USPSAddressVerificationError, USPSClient
@@ -649,6 +649,7 @@ class ShopkeepBot(discord.Client):
         self._bootstrapped = False
         self._last_polled: dict[int, int] = {}
         self._poll_tick: int = 0
+        self._guild_busy_state: dict[int, bool] = {}
 
     async def setup_hook(self):
         db.DB_PATH = DB_PATH_ENV
@@ -1285,42 +1286,59 @@ class ShopkeepBot(discord.Client):
         unnotified = await db.get_unnotified_conversations(conn, shop_id)
         busy_config = await db.get_busyhours_config(conn, guild_id)
 
+        currently_busy = False
+        if busy_config and busy_config.get("message"):
+            tz_str = busy_config.get("tz", "UTC")
+            start_h = busy_config["start"]
+            end_h = busy_config["end"]
+            currently_busy = _is_in_busy_hours(start_h, end_h, tz_str)
+
         for row in unnotified:
             conv_dict = dict(row)
             await channel.send(embed=build_message_embed(conv_dict, shop_name))
             await db.mark_conversation_notified(conn, row["conversation_id"])
 
-            if busy_config and busy_config.get("message"):
-                tz_str = busy_config.get("tz", "UTC")
-                start_h = busy_config["start"]
-                end_h = busy_config["end"]
-                if _is_in_busy_hours(start_h, end_h, tz_str):
-                    window_start_ts = _busy_window_start(start_h, end_h, tz_str)
-                    auto_replied_at = row["auto_replied_at"]
-                    already_replied = (
-                        auto_replied_at is not None and auto_replied_at >= window_start_ts
-                    )
-                    if not already_replied:
-                        conv_id = row["conversation_id"]
-                        reply_text = busy_config["message"]
-                        try:
-                            await loop.run_in_executor(
-                                None,
-                                lambda cid=conv_id, msg=reply_text: etsy.send_conversation_reply(
-                                    shop_id, cid, msg
-                                ),
+            if currently_busy:
+                window_start_ts = _busy_window_start(start_h, end_h, tz_str)
+                auto_replied_at = row["auto_replied_at"]
+                already_replied = (
+                    auto_replied_at is not None and auto_replied_at >= window_start_ts
+                )
+                if not already_replied:
+                    conv_id = row["conversation_id"]
+                    reply_text = busy_config["message"]
+                    try:
+                        await loop.run_in_executor(
+                            None,
+                            lambda cid=conv_id, msg=reply_text: etsy.send_conversation_reply(
+                                shop_id, cid, msg
+                            ),
+                        )
+                        await db.mark_conversation_auto_replied(conn, conv_id)
+                        buyer_name = row["buyer_name"] or "Unknown"
+                        await channel.send(
+                            embed=build_auto_reply_sent_embed(
+                                buyer_name, conv_id, reply_text, shop_name
                             )
-                            await db.mark_conversation_auto_replied(conn, conv_id)
-                            buyer_name = row["buyer_name"] or "Unknown"
-                            await channel.send(
-                                embed=build_auto_reply_sent_embed(
-                                    buyer_name, conv_id, reply_text, shop_name
-                                )
-                            )
-                        except Exception as exc:
-                            print(f"[poller] auto-reply failed conv={conv_id}: {exc}")
+                        )
+                    except Exception as exc:
+                        print(f"[poller] auto-reply failed conv={conv_id}: {exc}")
 
             await conn.commit()
+
+        # Detect busy → idle transition and post a follow-up reminder
+        was_busy = self._guild_busy_state.get(guild_id)
+        if was_busy is None:
+            # First run — seed state without triggering a reminder
+            self._guild_busy_state[guild_id] = currently_busy
+        elif was_busy and not currently_busy:
+            self._guild_busy_state[guild_id] = False
+            window_start_ts = _busy_window_start(start_h, end_h, tz_str)
+            pending = await db.get_auto_replied_conversations_since(conn, shop_id, window_start_ts)
+            if pending and channel:
+                await channel.send(embed=build_busy_hours_followup_embed(list(pending), shop_name))
+        else:
+            self._guild_busy_state[guild_id] = currently_busy
 
     # ── Commands ──────────────────────────────────────────────────────────────
 

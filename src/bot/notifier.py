@@ -616,6 +616,28 @@ def build_auto_reply_sent_embed(
     return embed
 
 
+def build_busy_hours_followup_embed(conversations: list, shop_name: str) -> discord.Embed:
+    """Reminder posted when busy hours end listing buyers who received an auto-reply."""
+    count = len(conversations)
+    embed = discord.Embed(
+        title=f"Busy Hours Over — {count} Buyer{'s' if count != 1 else ''} Waiting",
+        description="These buyers messaged during busy hours and got an auto-reply. Time to follow up!",
+        url="https://www.etsy.com/messages",
+        color=discord.Color.gold(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    for conv in conversations:
+        buyer = conv["buyer_name"] or "Unknown buyer"
+        preview = (conv["last_message_text"] or "").replace("\n", " ")[:80]
+        embed.add_field(
+            name=buyer,
+            value=f'"{preview}"' if preview else "*(no preview)*",
+            inline=False,
+        )
+    embed.set_footer(text=shop_name)
+    return embed
+
+
 def build_label_dm_embed(
     results: list[dict],
     shop_name: str,
