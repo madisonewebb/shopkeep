@@ -898,8 +898,17 @@ class ShopkeepBot(discord.Client):
         listings_resp = await loop.run_in_executor(
             None, lambda: etsy.get_shop_listings(shop_id, limit=100)
         )
+        unshipped_resp = await loop.run_in_executor(
+            None,
+            lambda: etsy.get_shop_receipts(
+                shop_id, was_paid=True, was_shipped=False, limit=100
+            ),
+        )
         receipts = response.get("results", [])
         listings = listings_resp.get("results", [])
+        etsy_unshipped_ids = {
+            r["receipt_id"] for r in unshipped_resp.get("results", [])
+        }
         raw_by_id = {r["receipt_id"]: r for r in receipts}
         channel = self.get_channel(channel_id)
         shop_name = shop_data.get("shop_name", "My Shop")
@@ -941,6 +950,14 @@ class ShopkeepBot(discord.Client):
                     conn, receipt["receipt_id"], shop_id, receipt.get("transactions", [])
                 )
             await conn.commit()
+
+            # Reconcile: mark locally-unshipped orders as shipped if Etsy no longer
+            # lists them as unshipped (catches orders shipped outside this bot's view).
+            local_unshipped = await db.get_unshipped_paid_receipt_ids(conn, shop_id)
+            stale = [rid for rid in local_unshipped if rid not in etsy_unshipped_ids]
+            if stale:
+                await db.mark_receipts_shipped_bulk(conn, stale)
+                await conn.commit()
 
             # Post status change notifications for already-seen receipts
             if channel:
@@ -1622,12 +1639,12 @@ class ShopkeepBot(discord.Client):
 
         @tree.command(name="reply", description="Send a reply to a buyer conversation on Etsy")
         @discord.app_commands.describe(
-            conversation_id="Buyer name or conversation ID",
+            buyer="Start typing a buyer name to search, or enter a conversation ID",
             message="Your reply to the buyer",
         )
-        @discord.app_commands.autocomplete(conversation_id=self._autocomplete_conversation)
-        async def reply_cmd(interaction: discord.Interaction, conversation_id: str, message: str):
-            await self._cmd_reply(interaction, conversation_id=conversation_id, message=message)
+        @discord.app_commands.autocomplete(buyer=self._autocomplete_conversation)
+        async def reply_cmd(interaction: discord.Interaction, buyer: str, message: str):
+            await self._cmd_reply(interaction, conversation_id=buyer, message=message)
 
     async def _autocomplete_conversation(
         self, interaction: discord.Interaction, current: str
