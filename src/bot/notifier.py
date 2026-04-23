@@ -621,8 +621,7 @@ def build_busy_hours_followup_embed(conversations: list, shop_name: str) -> disc
     count = len(conversations)
     embed = discord.Embed(
         title=f"Busy Hours Over — {count} Buyer{'s' if count != 1 else ''} Waiting",
-        description="These buyers messaged during busy hours and got an auto-reply. Time to follow up!",
-        url="https://www.etsy.com/messages",
+        description="These buyers messaged during busy hours and got an auto-reply. Use `/reply` to follow up!",
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc),
     )
