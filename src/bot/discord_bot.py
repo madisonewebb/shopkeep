@@ -1274,14 +1274,14 @@ class ShopkeepBot(discord.Client):
                 response = await loop.run_in_executor(
                     None, lambda: etsy.get_conversations(shop_id, limit=25)
                 )
-            except Exception as exc:
-                print(f"[poller] conversations guild={guild_id} {exc}")
+                convs = response.get("results", [])
+                for conv in convs:
+                    conv["shop_id"] = shop_id
+                    await db.upsert_conversation(conn, conv)
+                await conn.commit()
+            except Exception:
+                # Etsy v3 does not expose a public conversations API; silently skip.
                 return
-            convs = response.get("results", [])
-            for conv in convs:
-                conv["shop_id"] = shop_id
-                await db.upsert_conversation(conn, conv)
-            await conn.commit()
 
         unnotified = await db.get_unnotified_conversations(conn, shop_id)
         busy_config = await db.get_busyhours_config(conn, guild_id)

@@ -40,7 +40,7 @@ ETSY_AUTH_URL = "https://www.etsy.com/oauth/connect"
 ETSY_TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
 ETSY_API_BASE = "https://openapi.etsy.com/v3"
 
-ETSY_SCOPES = "transactions_r transactions_w listings_r shops_r profile_r messaging_r messaging_w"
+ETSY_SCOPES = "transactions_r transactions_w listings_r shops_r profile_r"
 
 PKCE_STATE_TTL = 600  # 10 minutes
 
