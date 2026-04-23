@@ -1005,6 +1005,7 @@ async def get_labelable_receipts(db: aiosqlite.Connection, shop_id: int) -> list
         FROM receipts r
         LEFT JOIN transactions t ON t.receipt_id = r.receipt_id AND t.shop_id = r.shop_id
         WHERE r.shop_id = ? AND r.is_paid = 1 AND r.is_shipped = 0
+          AND LOWER(r.status) != 'canceled'
         GROUP BY r.receipt_id
         ORDER BY r.create_timestamp DESC
         LIMIT 25
@@ -1348,6 +1349,27 @@ async def mark_receipt_shipped(db: aiosqlite.Connection, receipt_id: int) -> Non
     await db.execute(
         "UPDATE receipts SET is_shipped = 1 WHERE receipt_id = ?",
         (receipt_id,),
+    )
+
+
+async def get_unshipped_paid_receipt_ids(db: aiosqlite.Connection, shop_id: int) -> list[int]:
+    """Return receipt_ids that are locally marked paid+unshipped."""
+    cursor = await db.execute(
+        "SELECT receipt_id FROM receipts WHERE shop_id = ? AND is_paid = 1 AND is_shipped = 0",
+        (shop_id,),
+    )
+    rows = await cursor.fetchall()
+    return [row["receipt_id"] for row in rows]
+
+
+async def mark_receipts_shipped_bulk(db: aiosqlite.Connection, receipt_ids: list[int]) -> None:
+    """Mark multiple receipts as shipped in one statement."""
+    if not receipt_ids:
+        return
+    placeholders = ",".join("?" * len(receipt_ids))
+    await db.execute(
+        f"UPDATE receipts SET is_shipped = 1 WHERE receipt_id IN ({placeholders})",
+        receipt_ids,
     )
 
 
