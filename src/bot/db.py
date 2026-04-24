@@ -1341,3 +1341,23 @@ async def mark_receipts_shipped_bulk(db: aiosqlite.Connection, receipt_ids: list
     )
 
 
+async def get_buyer_orders(
+    db: aiosqlite.Connection, shop_id: int, buyer_name: str, limit: int = 5
+) -> list:
+    """Return recent paid receipts for a buyer matched by name (case-insensitive)."""
+    cursor = await db.execute(
+        """
+        SELECT r.receipt_id, r.name, r.create_timestamp,
+               GROUP_CONCAT(t.listing_title, ', ') AS items
+        FROM receipts r
+        LEFT JOIN transactions t ON t.receipt_id = r.receipt_id AND t.shop_id = r.shop_id
+        WHERE r.shop_id = ? AND LOWER(r.name) = LOWER(?) AND r.is_paid = 1
+        GROUP BY r.receipt_id
+        ORDER BY r.create_timestamp DESC
+        LIMIT ?
+        """,
+        (shop_id, buyer_name, limit),
+    )
+    return await cursor.fetchall()
+
+
