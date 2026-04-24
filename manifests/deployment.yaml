@@ -47,6 +47,11 @@ spec:
             secretKeyRef:
               name: shopkeep-secrets
               key: DISCORD_CLIENT_ID
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shopkeep-secrets
+              key: ANTHROPIC_API_KEY
         - name: POLL_INTERVAL_SECS
           value: "60"
         - name: DB_PATH

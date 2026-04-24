@@ -5,6 +5,7 @@ import secrets
 import time
 import zoneinfo
 
+import anthropic
 import discord
 from discord.ext import tasks
 from dotenv import load_dotenv
@@ -19,6 +20,11 @@ load_dotenv()
 
 ETSY_API_KEY = os.environ["ETSY_API_KEY"]
 ETSY_SHARED_SECRET = os.environ["ETSY_SHARED_SECRET"]
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+_anthropic: anthropic.Anthropic | None = None
+if ANTHROPIC_API_KEY:
+    _anthropic = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=30.0)
 POLL_INTERVAL_SECS = int(os.getenv("POLL_INTERVAL_SECS", "60"))
 DB_PATH_ENV = os.getenv("DB_PATH", "./shopkeep.db")
 WEB_BASE_URL = os.getenv("WEB_BASE_URL", "")
@@ -77,6 +83,81 @@ class OrdersView(discord.ui.View):
         self.current += 1
         self._update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+
+_TONE_INSTRUCTIONS = {
+    "friendly":     "Warm, upbeat, and conversational. Use a friendly sign-off.",
+    "professional": "Polished and courteous. Keep it concise and businesslike.",
+    "brief":        "Very short — two or three sentences maximum.",
+}
+
+_DRAFT_SYSTEM = """\
+You are a helpful assistant that drafts replies to Etsy buyer messages on behalf of a shop owner.
+Write only the reply text — no subject line, no commentary, no quotes around it.
+Match the requested tone exactly. Be genuine, helpful, and specific where context allows."""
+
+
+def _call_claude(
+    shop_name: str,
+    listings_summary: str,
+    buyer_name: str,
+    history: str,
+    message: str,
+    tone: str,
+) -> str:
+    if not _anthropic:
+        return "ANTHROPIC_API_KEY is not configured."
+    tone_instruction = _TONE_INSTRUCTIONS.get(tone, _TONE_INSTRUCTIONS["friendly"])
+    user_content = (
+        f"Shop: {shop_name}\n"
+        f"Listings sold: {listings_summary}\n"
+        f"Buyer: {buyer_name}\n"
+        f"Buyer order history: {history}\n"
+        f"Tone: {tone_instruction}\n\n"
+        f"Buyer's message:\n{message}\n\n"
+        "Draft a reply:"
+    )
+    resp = _anthropic.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        system=[{"type": "text", "text": _DRAFT_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": user_content}],
+    )
+    return resp.content[0].text.strip()
+
+
+def _build_draft_embed(buyer_name: str, message: str, draft: str, tone: str) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"Draft Reply — {buyer_name}",
+        color=discord.Color.blurple(),
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
+    )
+    embed.add_field(name="Their message", value=f'"{message[:300]}"', inline=False)
+    embed.add_field(name=f"Suggested reply ({tone})", value=draft[:1024], inline=False)
+    embed.set_footer(text="Copy the reply and send it on Etsy • Hit Regenerate for a new draft")
+    return embed
+
+
+class DraftView(discord.ui.View):
+    def __init__(self, shop_name: str, listings_summary: str, buyer_name: str, history: str, message: str, tone: str):
+        super().__init__(timeout=300)
+        self.shop_name = shop_name
+        self.listings_summary = listings_summary
+        self.buyer_name = buyer_name
+        self.history = history
+        self.message = message
+        self.tone = tone
+
+    @discord.ui.button(label="Regenerate", style=discord.ButtonStyle.secondary, emoji="🔄")
+    async def regenerate(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True)
+        loop = asyncio.get_running_loop()
+        draft = await loop.run_in_executor(
+            None,
+            lambda: _call_claude(self.shop_name, self.listings_summary, self.buyer_name, self.history, self.message, self.tone),
+        )
+        embed = _build_draft_embed(self.buyer_name, self.message, draft, self.tone)
+        await interaction.edit_original_response(embed=embed, view=self)
 
 
 class ConfirmDisconnectView(discord.ui.View):
@@ -1416,6 +1497,26 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(shippo_group)
 
+        @tree.command(name="draft", description="Use Claude to draft a reply to a buyer message")
+        @discord.app_commands.describe(
+            message="Paste the buyer's message here",
+            buyer="Buyer's name (optional — used to look up their order history)",
+            tone="Tone of the reply (default: friendly)",
+        )
+        @discord.app_commands.choices(tone=[
+            discord.app_commands.Choice(name="Friendly", value="friendly"),
+            discord.app_commands.Choice(name="Professional", value="professional"),
+            discord.app_commands.Choice(name="Brief", value="brief"),
+        ])
+        @discord.app_commands.autocomplete(buyer=self._autocomplete_buyer)
+        async def draft(
+            interaction: discord.Interaction,
+            message: str,
+            buyer: str = "",
+            tone: str = "friendly",
+        ):
+            await self._cmd_draft(interaction, message=message, buyer=buyer, tone=tone)
+
         @tree.command(name="bestsellers", description="Show top listings by units or revenue (this month / year / all-time)")
         @discord.app_commands.describe(
             period="Time period (default: this month)",
@@ -1492,6 +1593,36 @@ class ShopkeepBot(discord.Client):
             if current_lower in p["name"].lower()
         ][:25]
 
+    async def _autocomplete_buyer(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[discord.app_commands.Choice[str]]:
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            if not guild_row or not guild_row["etsy_shop_id"]:
+                return []
+            rows = await conn.execute_fetchall(
+                """
+                SELECT DISTINCT name FROM receipts
+                WHERE shop_id = ? AND name IS NOT NULL
+                ORDER BY receipt_id DESC
+                LIMIT 100
+                """,
+                (guild_row["etsy_shop_id"],),
+            )
+        current_lower = current.lower()
+        seen: set[str] = set()
+        choices = []
+        for row in rows:
+            name = row["name"]
+            if name in seen:
+                continue
+            seen.add(name)
+            if current_lower in name.lower():
+                choices.append(discord.app_commands.Choice(name=name, value=name))
+            if len(choices) == 25:
+                break
+        return choices
+
     async def _cmd_help(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(title="Shopkeep Commands", color=discord.Color.blurple())
         sections = [
@@ -1511,6 +1642,7 @@ class ShopkeepBot(discord.Client):
             ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
             ("/digest on/time/off/status", "Configure the daily order digest"),
             ("/goal set/status/off", "Set and track a monthly revenue goal"),
+            ("/draft <message> [buyer] [tone]", "Use Claude to draft a reply to a buyer message"),
         ]
         for name, desc in sections:
             embed.add_field(name=name, value=desc, inline=False)
@@ -2679,6 +2811,68 @@ class ShopkeepBot(discord.Client):
                 "All label purchases failed:\n" + "\n".join(f"- {e}" for e in errors),
                 ephemeral=True,
             )
+
+    async def _cmd_draft(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        buyer: str,
+        tone: str,
+    ) -> None:
+        if not _anthropic:
+            await interaction.response.send_message(
+                "AI drafting is not configured. Ask the server admin to add an `ANTHROPIC_API_KEY`.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        print(f"[draft] guild={interaction.guild_id} buyer={buyer!r} tone={tone}")
+
+        async with db.get_db() as conn:
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            shop_id = guild_row["etsy_shop_id"] if guild_row else None
+            shop_name = "our shop"
+            if shop_id:
+                shop_row = await conn.execute_fetchall(
+                    "SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,)
+                )
+                if shop_row:
+                    shop_name = shop_row[0]["shop_name"]
+
+            listings_summary = "various handmade items"
+            if shop_id:
+                listings = await db.get_active_listings(conn, shop_id)
+                if listings:
+                    titles = [r["title"] for r in listings[:10] if r["title"]]
+                    listings_summary = ", ".join(titles)
+
+            history = "No previous orders found."
+            if shop_id and buyer:
+                orders = await db.get_buyer_orders(conn, shop_id, buyer)
+                if orders:
+                    lines = [
+                        f"Order #{r['receipt_id']}: {r['items'] or 'unknown items'}"
+                        for r in orders
+                    ]
+                    history = "\n".join(lines)
+
+        loop = asyncio.get_running_loop()
+        print(f"[draft] calling Claude — shop={shop_name!r} buyer={buyer!r}")
+        try:
+            draft = await loop.run_in_executor(
+                None,
+                lambda: _call_claude(shop_name, listings_summary, buyer or "the buyer", history, message, tone),
+            )
+        except Exception as exc:
+            print(f"[draft] Claude call failed: {exc!r}")
+            await interaction.followup.send("Failed to generate a draft — please try again.", ephemeral=True)
+            return
+        print(f"[draft] Claude responded ok")
+
+        embed = _build_draft_embed(buyer or "buyer", message, draft, tone)
+        view = DraftView(shop_name, listings_summary, buyer or "the buyer", history, message, tone)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def _get_etsy_client_silent(
         self, interaction: discord.Interaction
