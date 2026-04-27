@@ -8,6 +8,12 @@ A multi-tenant Discord bot that posts Etsy order notifications to your server. E
 
 ---
 
+![Capstone Poster](assets/poster.png)
+
+*Sal (Shopkeep's mascot) artwork by Katie Castillo*
+
+---
+
 ## What it does
 
 - Guild owners authenticate their Etsy shop through a web onboarding flow
