@@ -88,13 +88,14 @@ class OrdersView(discord.ui.View):
 _TONE_INSTRUCTIONS = {
     "friendly":     "Warm, upbeat, and conversational. Use a friendly sign-off.",
     "professional": "Polished and courteous. Keep it concise and businesslike.",
-    "brief":        "Very short — two or three sentences maximum.",
+    "brief":        "Very short - two or three sentences maximum.",
 }
 
 _DRAFT_SYSTEM = """\
 You are a helpful assistant that drafts replies to Etsy buyer messages on behalf of a shop owner.
-Write only the reply text — no subject line, no commentary, no quotes around it.
-Match the requested tone exactly. Be genuine, helpful, and specific where context allows."""
+Write only the reply text - no subject line, no commentary, no quotes around it.
+Match the requested tone exactly. Be genuine, helpful, and specific where context allows.
+Do not use em dashes (—) or emojis. Use plain punctuation only."""
 
 
 def _call_claude(
@@ -2829,50 +2830,49 @@ class ShopkeepBot(discord.Client):
         await interaction.response.defer(ephemeral=True)
         print(f"[draft] guild={interaction.guild_id} buyer={buyer!r} tone={tone}")
 
-        async with db.get_db() as conn:
-            guild_row = await db.get_guild(conn, interaction.guild_id)
-            shop_id = guild_row["etsy_shop_id"] if guild_row else None
-            shop_name = "our shop"
-            if shop_id:
-                shop_row = await conn.execute_fetchall(
-                    "SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,)
-                )
-                if shop_row:
-                    shop_name = shop_row[0]["shop_name"]
-
-            listings_summary = "various handmade items"
-            if shop_id:
-                listings = await db.get_active_listings(conn, shop_id)
-                if listings:
-                    titles = [r["title"] for r in listings[:10] if r["title"]]
-                    listings_summary = ", ".join(titles)
-
-            history = "No previous orders found."
-            if shop_id and buyer:
-                orders = await db.get_buyer_orders(conn, shop_id, buyer)
-                if orders:
-                    lines = [
-                        f"Order #{r['receipt_id']}: {r['items'] or 'unknown items'}"
-                        for r in orders
-                    ]
-                    history = "\n".join(lines)
-
-        loop = asyncio.get_running_loop()
-        print(f"[draft] calling Claude — shop={shop_name!r} buyer={buyer!r}")
         try:
+            async with db.get_db() as conn:
+                guild_row = await db.get_guild(conn, interaction.guild_id)
+                shop_id = guild_row["etsy_shop_id"] if guild_row else None
+                shop_name = "our shop"
+                if shop_id:
+                    shop_row = await conn.execute_fetchall(
+                        "SELECT shop_name FROM shops WHERE shop_id = ?", (shop_id,)
+                    )
+                    if shop_row:
+                        shop_name = shop_row[0]["shop_name"]
+
+                listings_summary = "various handmade items"
+                if shop_id:
+                    listings = await db.get_active_listings(conn, shop_id)
+                    if listings:
+                        titles = [r["title"] for r in listings[:10] if r["title"]]
+                        listings_summary = ", ".join(titles)
+
+                history = "No previous orders found."
+                if shop_id and buyer:
+                    orders = await db.get_buyer_orders(conn, shop_id, buyer)
+                    if orders:
+                        lines = [
+                            f"Order #{r['receipt_id']}: {r['items'] or 'unknown items'}"
+                            for r in orders
+                        ]
+                        history = "\n".join(lines)
+
+            loop = asyncio.get_running_loop()
+            print(f"[draft] calling Claude - shop={shop_name!r} buyer={buyer!r}")
             draft = await loop.run_in_executor(
                 None,
                 lambda: _call_claude(shop_name, listings_summary, buyer or "the buyer", history, message, tone),
             )
-        except Exception as exc:
-            print(f"[draft] Claude call failed: {exc!r}")
-            await interaction.followup.send("Failed to generate a draft — please try again.", ephemeral=True)
-            return
-        print(f"[draft] Claude responded ok")
+            print(f"[draft] Claude responded ok")
 
-        embed = _build_draft_embed(buyer or "buyer", message, draft, tone)
-        view = DraftView(shop_name, listings_summary, buyer or "the buyer", history, message, tone)
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            embed = _build_draft_embed(buyer or "buyer", message, draft, tone)
+            view = DraftView(shop_name, listings_summary, buyer or "the buyer", history, message, tone)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        except Exception as exc:
+            print(f"[draft] failed: {exc!r}")
+            await interaction.followup.send("Failed to generate a draft - please try again.", ephemeral=True)
 
     async def _get_etsy_client_silent(
         self, interaction: discord.Interaction
