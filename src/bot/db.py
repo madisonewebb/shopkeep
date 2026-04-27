@@ -1349,7 +1349,7 @@ async def get_buyer_orders(
     cursor = await db.execute(
         """
         SELECT r.receipt_id, r.name, r.create_timestamp,
-               GROUP_CONCAT(t.listing_title, ', ') AS items
+               GROUP_CONCAT(t.title, ', ') AS items
         FROM receipts r
         LEFT JOIN transactions t ON t.receipt_id = r.receipt_id AND t.shop_id = r.shop_id
         WHERE r.shop_id = ? AND LOWER(r.name) = LOWER(?) AND r.is_paid = 1
