@@ -136,6 +136,7 @@ celerybeat.pid
 
 # SQLite dev database
 data/
+*.db
 
 # Environments
 .env

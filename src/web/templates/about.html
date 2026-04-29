@@ -1,87 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About - Shopkeep</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            sk: {
-              bg:      '#253345',
-              surface: '#2E2669',
-              s2:      '#443E97',
-              s3:      '#443E97',
-              border:  '#443E97',
-              brite:   '#A749A0',
-              indigo:  '#443E97',
-              blue:    '#A749A0',
-              lindigo: '#E58B8B',
-              lblue:   '#DF8090',
-              text:    '#CED5DE',
-              muted:   '#8C9AAD',
-              dim:     '#8C9AAD',
-            }
-          },
-          fontFamily: {
-            display: ['Avita', 'sans-serif'],
-            body: ['Avita', 'sans-serif'],
-            mono: ['Avita', 'sans-serif'],
-            mochibop: ['Mochibop', 'serif'],
-          }
-      }
-    }
-  </script>
-  <style>
-    @font-face {
-      font-family: 'Mochibop';
-      src: url("{{ url_for('static', filename='Mochibop-Demo.ttf') }}") format('truetype');
-      font-weight: 400;
-    }
-    @font-face {
-      font-family: 'Mochibop';
-      src: url("{{ url_for('static', filename='MochibopBold-Demo.ttf') }}") format('truetype');
-      font-weight: 700;
-    }
-    @font-face {
-      font-family: 'Avita';
-      src: url("{{ url_for('static', filename='fonts/Avita-RoundedThin.otf') }}") format('opentype');
-      font-weight: 100 500;
-    }
-    @font-face {
-      font-family: 'Avita';
-      src: url("{{ url_for('static', filename='fonts/Avita-RoundedBlack.otf') }}") format('opentype');
-      font-weight: 600 900;
-    }
-    body { font-family: 'Avita', sans-serif; }
-    .font-mochibop { font-family: 'Mochibop', serif; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #253345;
-      background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(167, 73, 160, 0.15) 0%, transparent 60%);
-      min-height: 100vh;
-      color: #CED5DE;
-    }
-    .main-nav {
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(37, 51, 69, 0.92);
-      border-bottom: 1px solid #443E97;
-    }
-    .btn-primary {
-      background: #443E97;
-      border: 1px solid rgba(68, 62, 151, 0.4);
-      transition: all 0.15s ease;
-      display: inline-block;
-    }
-    .btn-primary:hover {
-      background: #2E2669;
-      box-shadow: 0 0 0 3px rgba(68, 62, 151, 0.3);
-    }
-    .divider { height: 1px; background: #443E97; }
+{% extends 'layout.html' %}
+{% block title %}About - Shopkeep{% endblock %}
+{% block extra_styles %}
     .tech-pill {
       font-family: 'Avita', sans-serif;
       font-size: 0.75rem;
@@ -98,24 +17,8 @@
       font-size: 1rem;
       margin-bottom: 1rem;
     }
-  </style>
-</head>
-<body class="font-body text-sk-text antialiased" style="font-weight:450">
-
-  <nav class="main-nav fixed top-0 left-0 right-0 z-50">
-    <div class="max-w-5xl mx-auto px-6 py-3 relative flex items-center justify-between">
-      <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
-      <div class="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-        <a href="/" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Home</a>
-        <a href="/commands" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Commands</a>
-        <a href="/about" class="px-3 py-1.5 text-sm text-sk-text rounded-md">About</a>
-        <a href="/privacy" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Privacy</a>
-        <a href="/terms" class="px-3 py-1.5 text-sm text-sk-muted hover:text-sk-text rounded-md transition-colors">Terms</a>
-      </div>
-      <a href="{{ invite_url }}" class="btn-primary text-sm font-medium text-white px-4 py-1.5 rounded-lg">Add to Discord</a>
-    </div>
-  </nav>
-
+{% endblock %}
+{% block content %}
   <main class="pt-28 pb-24 px-6">
     <div class="max-w-2xl mx-auto">
 
@@ -152,20 +55,4 @@
 
     </div>
   </main>
-
-  <footer class="border-t border-sk-border py-8 px-6">
-    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-      <span class="font-display font-semibold text-sm text-sk-dim">Shopkeep</span>
-      <div class="flex flex-wrap justify-center gap-6 text-sm text-sk-dim">
-        <a href="/" class="hover:text-sk-muted transition-colors">Home</a>
-        <a href="/commands" class="hover:text-sk-muted transition-colors">Commands</a>
-        <a href="/about" class="hover:text-sk-muted transition-colors">About</a>
-        <a href="/privacy" class="hover:text-sk-muted transition-colors">Privacy Policy</a>
-        <a href="/terms" class="hover:text-sk-muted transition-colors">Terms of Service</a>
-      </div>
-    </div>
-    <p class="text-xs text-sk-dim font-mono text-center mt-4">The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This Application uses Etsy&rsquo;s API, but is not endorsed or certified by Etsy.</p>
-  </footer>
-
-</body>
-</html>
+{% endblock %}

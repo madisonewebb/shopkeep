@@ -1,75 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connected - Shopkeep</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            sk: {
-              bg:      '#253345',
-              surface: '#2E2669',
-              s2:      '#443E97',
-              s3:      '#443E97',
-              border:  '#443E97',
-              brite:   '#A749A0',
-              indigo:  '#443E97',
-              blue:    '#A749A0',
-              lindigo: '#E58B8B',
-              lblue:   '#DF8090',
-              text:    '#CED5DE',
-              muted:   '#8C9AAD',
-              dim:     '#8C9AAD',
-            }
-          },
-          fontFamily: {
-            display: ['Avita', 'sans-serif'],
-            body: ['Avita', 'sans-serif'],
-            mono: ['Avita', 'sans-serif'],
-            mochibop: ['Mochibop', 'serif'],
-          }
-      }
-    }
-  </script>
-  <style>
-    @font-face {
-      font-family: 'Mochibop';
-      src: url("{{ url_for('static', filename='Mochibop-Demo.ttf') }}") format('truetype');
-      font-weight: 400;
-    }
-    @font-face {
-      font-family: 'Mochibop';
-      src: url("{{ url_for('static', filename='MochibopBold-Demo.ttf') }}") format('truetype');
-      font-weight: 700;
-    }
-    @font-face {
-      font-family: 'Avita';
-      src: url("{{ url_for('static', filename='fonts/Avita-RoundedThin.otf') }}") format('opentype');
-      font-weight: 100 500;
-    }
-    @font-face {
-      font-family: 'Avita';
-      src: url("{{ url_for('static', filename='fonts/Avita-RoundedBlack.otf') }}") format('opentype');
-      font-weight: 600 900;
-    }
-    body { font-family: 'Avita', sans-serif; }
-    .font-mochibop { font-family: 'Mochibop', serif; }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #253345;
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(167, 73, 160, 0.15) 0%, transparent 60%);
-      min-height: 100vh;
-      color: #CED5DE;
-    }
-    .card {
-      background: #2E2669;
-      border: 1px solid #443E97;
-      border-radius: 16px;
-    }
+{% extends 'base.html' %}
+{% block title %}Connected - Shopkeep{% endblock %}
+{% block extra_styles %}
     .success-dot {
       width: 36px;
       height: 36px;
@@ -89,18 +20,12 @@
       border: 1px solid #443E97;
       border-radius: 8px;
     }
-    .cmd-row code {
-      font-family: 'Avita', sans-serif;
-      font-size: 0.8rem;
-      color: #DF8090;
-    }
-  </style>
-</head>
-<body class="font-body text-sk-text antialiased" style="font-weight:450">
-
+    .cmd-row code { font-size: 0.8rem; }
+{% endblock %}
+{% block body %}
   <div class="min-h-screen flex flex-col">
     <header class="py-4 flex items-center justify-center px-6 border-b border-sk-border">
-      <a href="/"><img src="{{ url_for('static', filename='logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
+      <a href="/"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Shopkeep" class="h-10 w-10 rounded-xl"></a>
     </header>
 
     <main class="flex-1 flex items-center justify-center px-6 py-16">
@@ -132,6 +57,4 @@
       </div>
     </main>
   </div>
-
-</body>
-</html>
+{% endblock %}
