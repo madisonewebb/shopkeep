@@ -788,11 +788,12 @@ class ShopkeepBot(discord.Client):
                 await conn.commit()
 
             print(f"[register] New guild found: '{guild.name}' ({guild.id})")
-            if WEB_BASE_URL and guild.owner:
+            if WEB_BASE_URL and guild.owner_id:
                 try:
+                    owner = guild.owner or await self.fetch_user(guild.owner_id)
                     setup_url = f"{WEB_BASE_URL}/connect/{setup_token}"
                     embed = build_welcome_embed(guild.name, setup_url)
-                    await guild.owner.send(embed=embed)
+                    await owner.send(embed=embed)
                 except discord.Forbidden:
                     pass
 
