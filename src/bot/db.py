@@ -56,11 +56,8 @@ CREATE TABLE IF NOT EXISTS shops (
     listing_active_count      INTEGER,
     digital_listing_count     INTEGER,
     login_name                TEXT,
-    accepts_custom_requests   INTEGER DEFAULT 0,
     url                       TEXT,
     num_favorers              INTEGER DEFAULT 0,
-    languages                 TEXT,
-    shop_location_country_iso TEXT,
     create_date               INTEGER,
     fetched_at                INTEGER NOT NULL
 )
@@ -462,9 +459,8 @@ async def upsert_shop(db: aiosqlite.Connection, shop: dict) -> None:
         INSERT OR REPLACE INTO shops (
             shop_id, shop_name, user_id, title, announcement, currency_code,
             is_vacation, listing_active_count, digital_listing_count, login_name,
-            accepts_custom_requests, url, num_favorers, languages,
-            shop_location_country_iso, create_date, fetched_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            url, num_favorers, create_date, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             shop["shop_id"],
@@ -477,11 +473,8 @@ async def upsert_shop(db: aiosqlite.Connection, shop: dict) -> None:
             shop.get("listing_active_count"),
             shop.get("digital_listing_count"),
             shop.get("login_name"),
-            1 if shop.get("accepts_custom_requests") else 0,
             shop.get("url"),
             shop.get("num_favorers", 0),
-            json.dumps(shop.get("languages", [])),
-            shop.get("shop_location_country_iso"),
             shop.get("create_date"),
             int(time.time()),
         ),

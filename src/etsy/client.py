@@ -89,14 +89,6 @@ class EtsyClient:
 
     # ── Endpoints ─────────────────────────────────────────────────────────────
 
-    def ping(self) -> Dict[str, Any]:
-        resp = self.session.get(
-            f"{self.BASE_URL}/application/openapi-ping",
-            headers={"x-api-key": self.api_key},
-        )
-        resp.raise_for_status()
-        return resp.json()
-
     def get_shop(self, shop_id: int) -> Dict[str, Any]:
         return self._request("GET", f"/application/shops/{shop_id}")
 
@@ -146,46 +138,6 @@ class EtsyClient:
     ) -> Dict[str, Any]:
         params = {"limit": limit, "offset": offset, "state": state, "includes": ["Images"]}
         return self._request("GET", f"/application/shops/{shop_id}/listings", params=params)
-
-    def get_shipping_profiles(self, shop_id: int) -> Dict[str, Any]:
-        return self._request("GET", f"/application/shops/{shop_id}/shipping-profiles")
-
-    def get_shipping_carriers(self, origin_country_iso: str = "US") -> Dict[str, Any]:
-        return self._request(
-            "GET",
-            "/application/shipping-carriers",
-            params={"origin_country_iso": origin_country_iso},
-        )
-
-    def create_shipping_label(
-        self,
-        shop_id: int,
-        receipt_id: int,
-        carrier_name: str,
-        mail_class: str,
-        weight_oz: float,
-        length_in: float,
-        width_in: float,
-        height_in: float,
-        package_type: str = "",
-    ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
-            "carrier_name": carrier_name,
-            "mail_class": mail_class,
-            "weight": weight_oz,
-            "weight_unit": "oz",
-            "length": length_in,
-            "width": width_in,
-            "height": height_in,
-            "dimension_unit": "in",
-        }
-        if package_type:
-            payload["package_type"] = package_type
-        return self._request(
-            "POST",
-            f"/application/shops/{shop_id}/receipts/{receipt_id}/shipping-labels",
-            json=payload,
-        )
 
     def create_receipt_shipment(
         self,
