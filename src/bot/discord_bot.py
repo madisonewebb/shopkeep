@@ -11,7 +11,7 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_low_stock_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
 from src.etsy.client import EtsyClient
 from src.shippo.client import ShippoClient
 from src.usps.client import USPSAddressVerificationError, USPSClient
@@ -941,9 +941,15 @@ class ShopkeepBot(discord.Client):
         async with db.get_db() as conn:
             await db.upsert_shop(conn, shop_data)
 
-            # Snapshot listing quantities before upsert to detect zero-crossings
+            # Snapshot listing quantities before upsert to detect zero-crossings and low-stock
             listing_ids = [l["listing_id"] for l in listings]
             qty_snapshot = await db.get_listing_quantity_snapshot(conn, listing_ids)
+            low_stock_threshold = await db.get_low_stock_threshold(conn, guild_id)
+            low_stock_snapshot = (
+                await db.get_listing_low_stock_snapshot(conn, listing_ids)
+                if low_stock_threshold
+                else {}
+            )
             await db.upsert_listings(conn, listings)
             await conn.commit()
 
@@ -952,17 +958,29 @@ class ShopkeepBot(discord.Client):
                     lid = listing["listing_id"]
                     old_qty = qty_snapshot.get(lid)
                     new_qty = listing.get("quantity", 0)
+                    first_image = (listing.get("images") or [{}])[0]
+                    listing_row = {
+                        "listing_id": lid,
+                        "title": listing.get("title", ""),
+                        "url": listing.get("url"),
+                        "image_url": first_image.get("url_75x75") or first_image.get("url_170x135"),
+                        "quantity": new_qty,
+                    }
                     # Only fire if listing was previously known (old_qty is not None),
                     # had stock, and now has none
                     if old_qty is not None and old_qty > 0 and new_qty == 0:
-                        first_image = (listing.get("images") or [{}])[0]
-                        listing_row = {
-                            "listing_id": lid,
-                            "title": listing.get("title", ""),
-                            "url": listing.get("url"),
-                            "image_url": first_image.get("url_75x75") or first_image.get("url_170x135"),
-                        }
                         await channel.send(embed=build_out_of_stock_embed(listing_row, shop_name))
+                    elif low_stock_threshold and old_qty is not None and 0 < new_qty <= low_stock_threshold:
+                        notified_qty = low_stock_snapshot.get(lid)
+                        if notified_qty != new_qty:
+                            await channel.send(embed=build_low_stock_embed(listing_row, low_stock_threshold, shop_name))
+                            await db.update_listing_low_stock_notified(conn, lid, new_qty)
+                            await conn.commit()
+                    elif low_stock_threshold and new_qty > low_stock_threshold:
+                        # Stock recovered above threshold — reset so alert can fire again
+                        if low_stock_snapshot.get(lid) is not None:
+                            await db.update_listing_low_stock_notified(conn, lid, None)
+                            await conn.commit()
 
             # Snapshot status before upserting so we can detect changes
             receipt_ids = [r["receipt_id"] for r in receipts]
@@ -1427,6 +1445,26 @@ class ShopkeepBot(discord.Client):
 
         tree.add_command(backlog_group)
 
+        lowstock_group = discord.app_commands.Group(
+            name="lowstock",
+            description="Configure low stock alerts for listings",
+        )
+
+        @lowstock_group.command(name="set", description="Alert when a listing's stock drops to this quantity or below")
+        @discord.app_commands.describe(threshold="Stock quantity that triggers an alert (e.g. 3)")
+        async def lowstock_set(interaction: discord.Interaction, threshold: int):
+            await self._cmd_lowstock_set(interaction, threshold=threshold)
+
+        @lowstock_group.command(name="off", description="Disable low stock alerts")
+        async def lowstock_off(interaction: discord.Interaction):
+            await self._cmd_lowstock_off(interaction)
+
+        @lowstock_group.command(name="status", description="Show the current low stock alert configuration")
+        async def lowstock_status(interaction: discord.Interaction):
+            await self._cmd_lowstock_status(interaction)
+
+        tree.add_command(lowstock_group)
+
         digest_group = discord.app_commands.Group(
             name="digest",
             description="Configure the daily order digest",
@@ -1641,6 +1679,7 @@ class ShopkeepBot(discord.Client):
             ("/preset add/list/remove", "Manage shipping presets — save carrier, mail class, weight, and dimensions for reuse with `/label`"),
             ("/reminders set/time/off/status", "Configure shipping deadline reminders"),
             ("/backlog set/off/status", "Alert when open unshipped orders exceed a threshold"),
+            ("/lowstock set/off/status", "Alert when a listing's stock drops to or below a threshold"),
             ("/digest on/time/off/status", "Configure the daily order digest"),
             ("/goal set/status/off", "Set and track a monthly revenue goal"),
             ("/draft <message> [buyer] [tone]", "Use Claude to draft a reply to a buyer message"),
@@ -1675,6 +1714,7 @@ class ShopkeepBot(discord.Client):
                 shop_row = await cursor.fetchone()
             reminder_config = await db.get_guild_reminder_config(conn, interaction.guild_id)
             backlog_config = await db.get_backlog_config(conn, interaction.guild_id)
+            low_stock_threshold = await db.get_low_stock_threshold(conn, interaction.guild_id)
             digest_config = await db.get_digest_config(conn, interaction.guild_id)
             goal_config = await db.get_goal_config(conn, interaction.guild_id)
 
@@ -1736,6 +1776,10 @@ class ShopkeepBot(discord.Client):
             feature_lines.append(f"Backlog warning: ≥{backlog_config['threshold']} orders")
         else:
             feature_lines.append("Backlog warning: off")
+        if low_stock_threshold is not None:
+            feature_lines.append(f"Low stock alerts: ≤{low_stock_threshold} in stock")
+        else:
+            feature_lines.append("Low stock alerts: off")
         if digest_config:
             feature_lines.append(f"Daily digest: {digest_config['time']} {digest_config['tz']}")
         else:
@@ -2301,6 +2345,57 @@ class ShopkeepBot(discord.Client):
         embed.add_field(name="Status", value="Enabled", inline=False)
         embed.add_field(name="Threshold", value=f"{config['threshold']} open orders", inline=False)
         embed.add_field(name="Currently warned", value="Yes" if config["warned"] else "No", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _cmd_lowstock_set(self, interaction: discord.Interaction, threshold: int) -> None:
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
+            return
+        if threshold < 1:
+            await interaction.response.send_message(
+                "Threshold must be at least 1.", ephemeral=True
+            )
+            return
+
+        async with db.get_db() as conn:
+            await db.set_low_stock_threshold(conn, interaction.guild_id, threshold)
+            guild_row = await db.get_guild(conn, interaction.guild_id)
+            await conn.commit()
+
+        channel_id = guild_row["order_channel_id"] if guild_row else None
+        channel_mention = f"<#{channel_id}>" if channel_id else "your notification channel"
+        await interaction.response.send_message(
+            f"Low stock alerts enabled. I'll notify in {channel_mention} whenever a listing drops to **{threshold} or fewer** in stock.",
+            ephemeral=True,
+        )
+
+    async def _cmd_lowstock_off(self, interaction: discord.Interaction) -> None:
+        if err := _check_guild_perm(interaction, "manage_guild"):
+            await interaction.response.send_message(err, ephemeral=True)
+            return
+
+        async with db.get_db() as conn:
+            await db.set_low_stock_threshold(conn, interaction.guild_id, None)
+            await conn.commit()
+
+        await interaction.response.send_message(
+            "Low stock alerts have been disabled.", ephemeral=True
+        )
+
+    async def _cmd_lowstock_status(self, interaction: discord.Interaction) -> None:
+        async with db.get_db() as conn:
+            threshold = await db.get_low_stock_threshold(conn, interaction.guild_id)
+
+        if threshold is None:
+            await interaction.response.send_message(
+                "Low stock alerts are **disabled**. Use `/lowstock set` to enable them.",
+                ephemeral=True,
+            )
+            return
+
+        embed = discord.Embed(title="Low Stock Alert Status", color=discord.Color.blurple())
+        embed.add_field(name="Status", value="Enabled", inline=False)
+        embed.add_field(name="Threshold", value=f"≤{threshold} in stock", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def _cmd_digest_on(self, interaction: discord.Interaction) -> None:

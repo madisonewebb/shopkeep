@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS listings (
     creation_timestamp      INTEGER,
     last_modified_timestamp INTEGER,
     image_url               TEXT,
+    low_stock_notified_qty  INTEGER,
     fetched_at              INTEGER NOT NULL
 )
 """
@@ -302,6 +303,14 @@ async def init_db() -> None:
             )
         except Exception:
             pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE guilds ADD COLUMN low_stock_threshold INTEGER")
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE listings ADD COLUMN low_stock_notified_qty INTEGER")
+        except Exception:
+            pass  # column already exists
         await db.commit()
 
 
@@ -483,15 +492,31 @@ async def upsert_shop(db: aiosqlite.Connection, shop: dict) -> None:
 
 async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
     price = listing.get("price", {})
+    image_url = (
+        ((listing.get("images") or [{}])[0]).get("url_570xN")
+        or ((listing.get("images") or [{}])[0]).get("url_170x135")
+    )
     await db.execute(
         """
-        INSERT OR REPLACE INTO listings (
+        INSERT INTO listings (
             listing_id, shop_id, user_id, title, description, state, quantity,
             url, num_favorers, is_customizable, is_personalizable, listing_type,
             tags, materials, price_amount, price_divisor, price_currency_code,
             views, is_digital, who_made, when_made, creation_timestamp,
             last_modified_timestamp, image_url, fetched_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(listing_id) DO UPDATE SET
+            shop_id=excluded.shop_id, user_id=excluded.user_id, title=excluded.title,
+            description=excluded.description, state=excluded.state, quantity=excluded.quantity,
+            url=excluded.url, num_favorers=excluded.num_favorers,
+            is_customizable=excluded.is_customizable, is_personalizable=excluded.is_personalizable,
+            listing_type=excluded.listing_type, tags=excluded.tags, materials=excluded.materials,
+            price_amount=excluded.price_amount, price_divisor=excluded.price_divisor,
+            price_currency_code=excluded.price_currency_code, views=excluded.views,
+            is_digital=excluded.is_digital, who_made=excluded.who_made, when_made=excluded.when_made,
+            creation_timestamp=excluded.creation_timestamp,
+            last_modified_timestamp=excluded.last_modified_timestamp,
+            image_url=excluded.image_url, fetched_at=excluded.fetched_at
         """,
         (
             listing["listing_id"],
@@ -517,8 +542,7 @@ async def upsert_listing(db: aiosqlite.Connection, listing: dict) -> None:
             listing.get("when_made"),
             listing.get("creation_timestamp"),
             listing.get("last_modified_timestamp"),
-            ((listing.get("images") or [{}])[0]).get("url_570xN")
-            or ((listing.get("images") or [{}])[0]).get("url_170x135"),
+            image_url,
             int(time.time()),
         ),
     )
@@ -877,6 +901,52 @@ async def get_listing_quantity_snapshot(
     )
     rows = await cursor.fetchall()
     return {row["listing_id"]: row["quantity"] for row in rows}
+
+
+async def get_listing_low_stock_snapshot(
+    db: aiosqlite.Connection, listing_ids: list[int]
+) -> dict[int, int | None]:
+    """Return {listing_id: low_stock_notified_qty} for all known listing IDs."""
+    if not listing_ids:
+        return {}
+    placeholders = ",".join("?" * len(listing_ids))
+    cursor = await db.execute(
+        f"SELECT listing_id, low_stock_notified_qty FROM listings WHERE listing_id IN ({placeholders})",
+        listing_ids,
+    )
+    rows = await cursor.fetchall()
+    return {row["listing_id"]: row["low_stock_notified_qty"] for row in rows}
+
+
+async def update_listing_low_stock_notified(
+    db: aiosqlite.Connection, listing_id: int, qty: int | None
+) -> None:
+    """Set low_stock_notified_qty for a listing. Pass None to reset."""
+    await db.execute(
+        "UPDATE listings SET low_stock_notified_qty = ? WHERE listing_id = ?",
+        (qty, listing_id),
+    )
+
+
+async def get_low_stock_threshold(
+    db: aiosqlite.Connection, guild_id: int
+) -> int | None:
+    """Return the low stock threshold for a guild, or None if disabled."""
+    cursor = await db.execute(
+        "SELECT low_stock_threshold FROM guilds WHERE guild_id = ?", (guild_id,)
+    )
+    row = await cursor.fetchone()
+    return row[0] if row else None
+
+
+async def set_low_stock_threshold(
+    db: aiosqlite.Connection, guild_id: int, threshold: int | None
+) -> None:
+    """Set the low stock threshold. Pass None to disable."""
+    await db.execute(
+        "UPDATE guilds SET low_stock_threshold = ? WHERE guild_id = ?",
+        (threshold, guild_id),
+    )
 
 
 async def get_active_listings(db: aiosqlite.Connection, shop_id: int) -> list:

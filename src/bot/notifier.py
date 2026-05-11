@@ -447,6 +447,26 @@ def build_backlog_embed(count: int, threshold: int, shop_name: str) -> discord.E
     return embed
 
 
+def build_low_stock_embed(listing: dict, threshold: int, shop_name: str) -> discord.Embed:
+    """Build a Discord embed for a low-stock listing alert."""
+    title = listing.get("title", "Unknown Listing")
+    url = listing.get("url")
+    qty = listing.get("quantity", 0)
+    link = f"**[{title}]({url})**" if url else f"**{title}**"
+    embed = discord.Embed(
+        title="Low Stock Alert",
+        description=(
+            f"{link}\n"
+            f"Only **{qty}** left in stock (threshold: {threshold})."
+        ),
+        color=discord.Color.yellow(),
+    )
+    if image_url := listing.get("image_url"):
+        embed.set_thumbnail(url=image_url)
+    embed.set_footer(text=shop_name)
+    return embed
+
+
 def build_out_of_stock_embed(listing: dict, shop_name: str) -> discord.Embed:
     """Build a Discord embed for an out-of-stock listing notification."""
     title = listing.get("title", "Unknown Listing")
