@@ -1057,8 +1057,10 @@ class ShopkeepBot(discord.Client):
         now_local = datetime.datetime.now(tz)
         h, m = map(int, config["time"].split(":"))
         target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
-        diff = abs((now_local - target).total_seconds())
-        if diff > POLL_INTERVAL_SECS / 2:
+        # Fire on the first poll cycle at or after the target time. We can't rely
+        # on a cycle landing in a narrow ±window because the poll cadence drifts
+        # when Etsy calls are slow; the 23h cooldown below prevents repeats.
+        if now_local < target:
             return
 
         # Don't send more than once per day (23h cooldown)
@@ -1211,7 +1213,9 @@ class ShopkeepBot(discord.Client):
         if not config or channel is None:
             return
 
-        # If a time-of-day is configured, only fire during the poll window that contains it
+        # If a time-of-day is configured, hold reminders until the first poll
+        # cycle at or after that time. A narrow ±window would be skipped when the
+        # poll cadence drifts; per-receipt mark_reminder_sent prevents repeats.
         if config["time"] and config["tz"]:
             try:
                 tz = zoneinfo.ZoneInfo(config["tz"])
@@ -1220,8 +1224,7 @@ class ShopkeepBot(discord.Client):
             now_local = datetime.datetime.now(tz)
             h, m = map(int, config["time"].split(":"))
             target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
-            diff = abs((now_local - target).total_seconds())
-            if diff > POLL_INTERVAL_SECS / 2:
+            if now_local < target:
                 return
 
         reminder_days = config["days"]

@@ -14,6 +14,10 @@ class EtsyClient:
     BASE_URL = "https://openapi.etsy.com/v3"
     TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
 
+    # (connect, read) timeout in seconds. Without this, a half-open connection
+    # can hang a request indefinitely, stalling the bot's 60s poll cycle.
+    REQUEST_TIMEOUT = (5, 15)
+
     def __init__(
         self,
         api_key: str,
@@ -46,6 +50,7 @@ class EtsyClient:
                 "client_id": self.api_key,
                 "refresh_token": self.refresh_token,
             },
+            timeout=self.REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -66,6 +71,7 @@ class EtsyClient:
     def _request(self, method: str, path: str, **kwargs) -> Any:
         self._ensure_fresh_token()
         url = f"{self.BASE_URL}{path}"
+        kwargs.setdefault("timeout", self.REQUEST_TIMEOUT)
 
         try:
             resp = self.session.request(method, url, headers=self._headers(), **kwargs)
