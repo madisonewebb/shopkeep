@@ -110,6 +110,27 @@ def build_disconnect_embed(shop_name: str) -> discord.Embed:
     return embed
 
 
+def build_reconnect_embed(guild_name: str, setup_url: str) -> discord.Embed:
+    """Build the DM sent to the guild owner when the Etsy connection stops working.
+
+    Sent after repeated refresh-token rejections — the shop stays configured, but
+    polling is paused until the owner re-authorizes via the setup link.
+    """
+    embed = discord.Embed(
+        title="Etsy Connection Needs Attention",
+        description=(
+            f"Shopkeep can no longer reach the Etsy shop linked to **{guild_name}** — "
+            "Etsy is rejecting the stored credentials (they expire after ~90 days "
+            "without use, or when access is revoked).\n\n"
+            f"Order notifications are paused. [Reconnect your shop]({setup_url}) to "
+            "resume them — this link expires in 24 hours; run `/status` in the server "
+            "to generate a fresh one."
+        ),
+        color=discord.Color.orange(),
+    )
+    return embed
+
+
 def build_status_change_embed(
     receipt: dict,
     shop_name: str,

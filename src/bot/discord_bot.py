@@ -11,8 +11,8 @@ from discord.ext import tasks
 from dotenv import load_dotenv
 
 from src.bot import db
-from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_low_stock_embed, build_order_embed, build_out_of_stock_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
-from src.etsy.client import EtsyClient
+from src.bot.notifier import build_backlog_embed, build_bestsellers_embed, build_connected_embed, build_digest_embed, build_disconnect_embed, build_goal_milestone_embed, build_label_dm_embed, build_label_public_embed, build_low_stock_embed, build_order_embed, build_out_of_stock_embed, build_reconnect_embed, build_review_embed, build_shipping_reminder_embed, build_shop_embed, build_status_change_embed, build_welcome_embed
+from src.etsy.client import EtsyAuthError, EtsyClient
 from src.shippo.client import ShippoClient
 from src.usps.client import USPSAddressVerificationError, USPSClient
 
@@ -34,6 +34,10 @@ if os.getenv("USPS_CLIENT_ID") and os.getenv("USPS_CLIENT_SECRET"):
     _usps_client = USPSClient(os.environ["USPS_CLIENT_ID"], os.environ["USPS_CLIENT_SECRET"])
 
 SETUP_TOKEN_TTL = 86400  # 24 hours
+
+# Consecutive refresh-token rejections before a guild's polling is paused and
+# its owner is DMed a reconnect link. A dead grant can never succeed on retry.
+AUTH_FAILURE_LIMIT = 3
 
 
 _ORDERS_PAGE_SIZE = 5
@@ -697,6 +701,11 @@ class ShopkeepBot(discord.Client):
         self._bootstrapped = False
         self._last_polled: dict[int, int] = {}
         self._poll_tick: int = 0
+        # guild_id -> consecutive EtsyAuthError count from the poll loop
+        self._auth_failures: dict[int, int] = {}
+        # guild_id -> the DB access_token that was active when polling was paused;
+        # polling resumes when the web OAuth flow writes a different token
+        self._auth_broken: dict[int, str] = {}
 
     async def setup_hook(self):
         db.DB_PATH = DB_PATH_ENV
@@ -875,6 +884,12 @@ class ShopkeepBot(discord.Client):
                 tokens = await db.get_guild_tokens(conn, guild_id)
                 if not tokens:
                     continue
+                if guild_id in self._auth_broken:
+                    if tokens["access_token"] == self._auth_broken[guild_id]:
+                        continue  # same dead credentials; stay paused until reconnect
+                    del self._auth_broken[guild_id]
+                    self._auth_failures.pop(guild_id, None)
+                    print(f"[poller] guild={guild_id} new tokens found — resuming polling")
                 existing = self.etsy_clients.get(guild_id)
                 if existing is None or existing.access_token != tokens["access_token"]:
                     self._register_client(
@@ -914,8 +929,46 @@ class ShopkeepBot(discord.Client):
     async def _safe_poll_guild(self, guild_id: int, shop_id: int, channel_id: int) -> None:
         try:
             await self._poll_guild(guild_id, shop_id, channel_id)
+            self._auth_failures.pop(guild_id, None)
+        except EtsyAuthError as exc:
+            await self._handle_auth_failure(guild_id, exc)
         except Exception as exc:
             print(f"[poller] guild={guild_id} {exc}")
+
+    async def _handle_auth_failure(self, guild_id: int, exc: EtsyAuthError) -> None:
+        """Pause a guild whose refresh token Etsy keeps rejecting and DM its owner.
+
+        After AUTH_FAILURE_LIMIT consecutive rejections the guild's client is
+        dropped and the poll loop skips it until the web OAuth flow writes fresh
+        tokens to the DB. The shop config (channel, reminders, etc.) is untouched.
+        """
+        count = self._auth_failures.get(guild_id, 0) + 1
+        self._auth_failures[guild_id] = count
+        print(f"[poller] guild={guild_id} auth failure {count}/{AUTH_FAILURE_LIMIT}: {exc}")
+        if count < AUTH_FAILURE_LIMIT:
+            return
+
+        self.etsy_clients.pop(guild_id, None)
+        setup_token = secrets.token_urlsafe(16)
+        setup_token_exp = int(time.time()) + SETUP_TOKEN_TTL
+        async with db.get_db() as conn:
+            tokens = await db.get_guild_tokens(conn, guild_id)
+            self._auth_broken[guild_id] = tokens["access_token"] if tokens else ""
+            await db.refresh_setup_token(conn, guild_id, setup_token, setup_token_exp)
+            await conn.commit()
+        print(f"[poller] guild={guild_id} polling paused until the shop is reconnected")
+
+        if not WEB_BASE_URL:
+            return
+        guild = self.get_guild(guild_id)
+        if guild is None or not guild.owner_id:
+            return
+        try:
+            owner = guild.owner or await self.fetch_user(guild.owner_id)
+            setup_url = f"{WEB_BASE_URL}/connect/{setup_token}"
+            await owner.send(embed=build_reconnect_embed(guild.name, setup_url))
+        except discord.Forbidden:
+            pass  # Owner has DMs disabled
 
     @poll_orders.before_loop
     async def before_poll(self):
@@ -1057,8 +1110,10 @@ class ShopkeepBot(discord.Client):
         now_local = datetime.datetime.now(tz)
         h, m = map(int, config["time"].split(":"))
         target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
-        diff = abs((now_local - target).total_seconds())
-        if diff > POLL_INTERVAL_SECS / 2:
+        # Fire on the first poll cycle at or after the target time. We can't rely
+        # on a cycle landing in a narrow ±window because the poll cadence drifts
+        # when Etsy calls are slow; the 23h cooldown below prevents repeats.
+        if now_local < target:
             return
 
         # Don't send more than once per day (23h cooldown)
@@ -1211,7 +1266,9 @@ class ShopkeepBot(discord.Client):
         if not config or channel is None:
             return
 
-        # If a time-of-day is configured, only fire during the poll window that contains it
+        # If a time-of-day is configured, hold reminders until the first poll
+        # cycle at or after that time. A narrow ±window would be skipped when the
+        # poll cadence drifts; per-receipt mark_reminder_sent prevents repeats.
         if config["time"] and config["tz"]:
             try:
                 tz = zoneinfo.ZoneInfo(config["tz"])
@@ -1220,8 +1277,7 @@ class ShopkeepBot(discord.Client):
             now_local = datetime.datetime.now(tz)
             h, m = map(int, config["time"].split(":"))
             target = now_local.replace(hour=h, minute=m, second=0, microsecond=0)
-            diff = abs((now_local - target).total_seconds())
-            if diff > POLL_INTERVAL_SECS / 2:
+            if now_local < target:
                 return
 
         reminder_days = config["days"]

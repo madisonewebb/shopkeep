@@ -10,9 +10,21 @@ from typing import Any, Callable, Dict, Optional
 import requests
 
 
+class EtsyAuthError(Exception):
+    """Etsy rejected the refresh token — the shop must be reconnected via OAuth.
+
+    Raised on a 400/401 from the token endpoint, which means the grant itself is
+    dead (expired after 90 days of disuse, or revoked). Retrying cannot succeed.
+    """
+
+
 class EtsyClient:
     BASE_URL = "https://openapi.etsy.com/v3"
     TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
+
+    # (connect, read) timeout in seconds. Without this, a half-open connection
+    # can hang a request indefinitely, stalling the bot's 60s poll cycle.
+    REQUEST_TIMEOUT = (5, 15)
 
     def __init__(
         self,
@@ -46,7 +58,10 @@ class EtsyClient:
                 "client_id": self.api_key,
                 "refresh_token": self.refresh_token,
             },
+            timeout=self.REQUEST_TIMEOUT,
         )
+        if resp.status_code in (400, 401):
+            raise EtsyAuthError(f"token refresh rejected ({resp.status_code}): {resp.text[:200]}")
         resp.raise_for_status()
         data = resp.json()
         self.access_token = data["access_token"]
@@ -66,6 +81,7 @@ class EtsyClient:
     def _request(self, method: str, path: str, **kwargs) -> Any:
         self._ensure_fresh_token()
         url = f"{self.BASE_URL}{path}"
+        kwargs.setdefault("timeout", self.REQUEST_TIMEOUT)
 
         try:
             resp = self.session.request(method, url, headers=self._headers(), **kwargs)
