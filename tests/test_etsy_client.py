@@ -3,7 +3,9 @@
 import time
 from unittest.mock import MagicMock, patch
 
-from src.etsy.client import EtsyClient
+import pytest
+
+from src.etsy.client import EtsyAuthError, EtsyClient
 
 
 def make_client(**kwargs) -> EtsyClient:
@@ -77,3 +79,30 @@ def test_401_triggers_refresh_and_retry():
 
     assert result == {"data": 1}
     client.session.post.assert_called_once()
+
+
+@pytest.mark.parametrize("status_code", [400, 401])
+def test_rejected_refresh_raises_auth_error(status_code):
+    client = make_client(expires_at=0)
+    rejected = MagicMock()
+    rejected.status_code = status_code
+    rejected.text = '{"error": "invalid_grant"}'
+    client.session.post.return_value = rejected
+
+    with pytest.raises(EtsyAuthError):
+        client.get_shop(1)
+
+    client.session.request.assert_not_called()
+
+
+def test_refresh_server_error_is_not_auth_error():
+    client = make_client(expires_at=0)
+    flaky = MagicMock()
+    flaky.status_code = 500
+    flaky.raise_for_status.side_effect = Exception("server error")
+    client.session.post.return_value = flaky
+
+    with pytest.raises(Exception) as excinfo:
+        client.get_shop(1)
+
+    assert not isinstance(excinfo.value, EtsyAuthError)

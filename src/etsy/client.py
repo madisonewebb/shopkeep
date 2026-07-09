@@ -10,6 +10,14 @@ from typing import Any, Callable, Dict, Optional
 import requests
 
 
+class EtsyAuthError(Exception):
+    """Etsy rejected the refresh token — the shop must be reconnected via OAuth.
+
+    Raised on a 400/401 from the token endpoint, which means the grant itself is
+    dead (expired after 90 days of disuse, or revoked). Retrying cannot succeed.
+    """
+
+
 class EtsyClient:
     BASE_URL = "https://openapi.etsy.com/v3"
     TOKEN_URL = "https://api.etsy.com/v3/public/oauth/token"
@@ -52,6 +60,8 @@ class EtsyClient:
             },
             timeout=self.REQUEST_TIMEOUT,
         )
+        if resp.status_code in (400, 401):
+            raise EtsyAuthError(f"token refresh rejected ({resp.status_code}): {resp.text[:200]}")
         resp.raise_for_status()
         data = resp.json()
         self.access_token = data["access_token"]
