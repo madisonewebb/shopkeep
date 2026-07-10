@@ -959,16 +959,20 @@ class ShopkeepBot(discord.Client):
         print(f"[poller] guild={guild_id} polling paused until the shop is reconnected")
 
         if not WEB_BASE_URL:
+            print(f"[poller] guild={guild_id} WEB_BASE_URL unset — reconnect DM not sent")
             return
         guild = self.get_guild(guild_id)
         if guild is None or not guild.owner_id:
+            print(f"[poller] guild={guild_id} owner unknown — reconnect DM not sent")
             return
         try:
             owner = guild.owner or await self.fetch_user(guild.owner_id)
             setup_url = f"{WEB_BASE_URL}/connect/{setup_token}"
             await owner.send(embed=build_reconnect_embed(guild.name, setup_url))
+            print(f"[poller] guild={guild_id} reconnect DM sent to owner {owner.id}")
         except discord.Forbidden:
-            pass  # Owner has DMs disabled
+            # Owner has DMs disabled; /status in the server still yields a fresh link
+            print(f"[poller] guild={guild_id} owner has DMs disabled — reconnect DM not delivered")
 
     @poll_orders.before_loop
     async def before_poll(self):
