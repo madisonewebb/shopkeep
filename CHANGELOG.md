@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.4.1](https://github.com/madisonewebb/shopkeep/compare/v1.4.0...v1.4.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* add Etsy request timeouts and drift-tolerant notification windows ([dbf5bbb](https://github.com/madisonewebb/shopkeep/commit/dbf5bbb4d0e93fde973126c20d4324058182b776))
+* add Etsy request timeouts and drift-tolerant notification windows ([0422f0f](https://github.com/madisonewebb/shopkeep/commit/0422f0f054ef1e56a950b76a86344f972cefd8a6))
+* log reconnect DM delivery outcome ([aaf2e55](https://github.com/madisonewebb/shopkeep/commit/aaf2e55b0daffae29a525f0bb34d6433172579db))
+* log reconnect DM delivery outcome ([883de47](https://github.com/madisonewebb/shopkeep/commit/883de477fed9c4758546841797d3e963db901de4))
+* pause polling and DM owner when Etsy refresh token is rejected ([d511828](https://github.com/madisonewebb/shopkeep/commit/d511828e8c08e45f2558c276209ba4ffc4f7ffc3))
+
 ## [1.4.0](https://github.com/madisonewebb/shopkeep/compare/v1.3.0...v1.4.0) (2026-05-11)
 
 
